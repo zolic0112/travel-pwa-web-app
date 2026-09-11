@@ -1,5 +1,49 @@
-const CACHE='malaysia-trip-v3';
-const ASSETS=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
-self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
-self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
-self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{const copy=res.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return res;}).catch(()=>caches.match('./index.html'))));});
+const VERSION = 'v4';
+const SHELL = `shell-${VERSION}`;
+const ASSETS = `assets-${VERSION}`;
+const SHELL_URLS = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(SHELL).then(c => c.addAll(SHELL_URLS)).then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== SHELL && k !== ASSETS).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+const isShell = url => url.pathname.endsWith('/') || /\.(html|css|js|webmanifest)$/.test(url.pathname);
+
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  if (url.origin !== location.origin) return;
+
+  // Shell goes network-first so a deploy is visible on the next load; the cache
+  // is the offline fallback, not the source of truth. Cache-first here is what
+  // made an earlier deploy invisible to anyone who had already opened the app.
+  if (isShell(url)) {
+    e.respondWith(
+      fetch(e.request, { cache: 'no-cache' })
+        .then(res => {
+          const copy = res.clone();
+          caches.open(SHELL).then(c => c.put(e.request, copy));
+          return res;
+        })
+        .catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // Icons and the like never change under the same name.
+  e.respondWith(
+    caches.match(e.request).then(r => r || fetch(e.request).then(res => {
+      const copy = res.clone();
+      caches.open(ASSETS).then(c => c.put(e.request, copy));
+      return res;
+    }))
+  );
+});
