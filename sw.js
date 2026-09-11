@@ -29,8 +29,12 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       fetch(e.request, { cache: 'no-cache' })
         .then(res => {
-          const copy = res.clone();
-          caches.open(SHELL).then(c => c.put(e.request, copy));
+          // Never store a 404 or a 5xx. A deployment window that briefly serves
+          // an error page would otherwise persist as the offline fallback.
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(SHELL).then(c => c.put(e.request, copy));
+          }
           return res;
         })
         .catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
@@ -41,8 +45,10 @@ self.addEventListener('fetch', e => {
   // Icons and the like never change under the same name.
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(res => {
-      const copy = res.clone();
-      caches.open(ASSETS).then(c => c.put(e.request, copy));
+      if (res.ok) {
+        const copy = res.clone();
+        caches.open(ASSETS).then(c => c.put(e.request, copy));
+      }
       return res;
     }))
   );
