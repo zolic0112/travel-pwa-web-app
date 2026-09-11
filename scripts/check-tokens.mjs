@@ -19,6 +19,20 @@ const required = new Set(
     .map(m => m[1])
 );
 
+// A selector left without a block swallows everything after it until the next
+// closing brace, silently deleting whole sections of the stylesheet.
+const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
+if (stripped.split('{').length !== stripped.split('}').length) {
+  console.error(`styles.css has unbalanced braces: ${stripped.split('{').length - 1} "{" vs ${stripped.split('}').length - 1} "}"`);
+  process.exit(1);
+}
+const orphan = [...stripped.matchAll(/\n\s*([.#][^{}\n;]*[^{}\s;])\s*\n\s*(?=[.#@])/g)].map(m => m[1].trim());
+if (orphan.length) {
+  console.error('styles.css has selectors with no block:');
+  for (const o of orphan) console.error(`  ${o.slice(0, 70)}`);
+  process.exit(1);
+}
+
 const missing = [...required].filter(n => !defined.has(n)).sort();
 if (missing.length) {
   console.error(`styles.css uses ${missing.length} undefined custom propert${missing.length === 1 ? 'y' : 'ies'}:`);
