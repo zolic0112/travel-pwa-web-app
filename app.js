@@ -75,7 +75,8 @@ const trip = {
 };
 
 /* ── icons ────────────────────────────────────────────────── */
-const S = (p,fill) => `<svg viewBox="0 0 24 24" ${fill?'fill="currentColor"':'fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"'}>${p}</svg>`;
+/* every icon sits beside visible text, so all of them are decorative */
+const S = (p,fill) => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" ${fill?'fill="currentColor"':'fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"'}>${p}</svg>`;
 const ICO = {
   plane:S('<path d="M21 15.5v-1.7l-7.5-4.6V4.4a1.5 1.5 0 0 0-3 0v4.8L3 13.8v1.7l7.5-2.3v4.6l-2 1.4v1.3l3.5-1 3.5 1v-1.3l-2-1.4v-4.6z"/>',1),
   train:S('<rect x="5" y="3" width="14" height="13" rx="3.5"/><path d="M5 9.5h14M9.5 12.8h.01M14.5 12.8h.01M8.5 16 6.5 21M15.5 16l2 5"/>'),
@@ -135,16 +136,20 @@ function dayChips(current, onPick, stripId){
   const chips=tripDates.map((iso,i)=>{
     const label=tripDateLabels[i];
     const evs=trip.days[i].events;
+    const mine=plans.filter(p=>p.date===iso).length;
+    const critical=evs.some(e=>e.level==='critical');
     const dots=evs.slice(0,5).map(e=>`<i class="${e.level==='critical'?'risk':'on'}"></i>`).join('')
-      + (plans.some(p=>p.date===iso)?'<i class="on"></i>':'');
+      + (mine?'<i class="on"></i>':'');
     const on=String(current)===String(i)?' active':'';
-    return `<button class="day-chip${on}" data-pick="${i}" role="tab" aria-selected="${!!on}">
-      <span class="dc-date">${label.slice(0,5)}</span>
-      <span class="dc-dow">${label.slice(6,7)}</span>
-      <span class="dc-dot">${dots}</span></button>`;
+    /* the dots alone would carry meaning by colour only, so spell it out for assistive tech */
+    const desc=`${label}，${evs.length} 項固定行程${mine?`，${mine} 項自訂行程`:''}${critical?'，含關鍵事件':''}`;
+    return `<button class="day-chip${on}" data-pick="${i}" aria-pressed="${!!on}" aria-label="${desc}">
+      <span class="dc-date" aria-hidden="true">${label.slice(0,5)}</span>
+      <span class="dc-dow" aria-hidden="true">${label.slice(6,7)}</span>
+      <span class="dc-dot" aria-hidden="true">${dots}</span></button>`;
   }).join('');
   const allOn=current==='all'?' active':'';
-  $(stripId).innerHTML=`<button class="day-chip all${allOn}" data-pick="all" role="tab" aria-selected="${current==='all'}">全部</button>${chips}`;
+  $(stripId).innerHTML=`<button class="day-chip all${allOn}" data-pick="all" aria-pressed="${current==='all'}">全部日期</button>${chips}`;
   $$(`${stripId} .day-chip`).forEach(b=>b.onclick=()=>onPick(b.dataset.pick));
 }
 
@@ -323,6 +328,13 @@ function formatCountdown(ms){
   if(h>0) return `<span class="cd-n">${h}</span><span class="cd-u">時</span><span class="cd-n">${m}</span><span class="cd-u">分</span>`;
   return `<span class="cd-n">${m}</span><span class="cd-u">分</span>`;
 }
+function countdownText(ms){
+  if(ms<=0) return '進行中';
+  const min=Math.floor(ms/60000), d=Math.floor(min/1440), h=Math.floor((min%1440)/60), m=min%60;
+  if(d>0) return `還有 ${d} 天 ${h} 小時`;
+  if(h>0) return `還有 ${h} 小時 ${m} 分`;
+  return `還有 ${m} 分鐘`;
+}
 function stamp(iso){
   return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(iso));
 }
@@ -350,6 +362,15 @@ function updateNextEvent(){
   const prev=i>0?new Date(all[i-1].at).getTime():t-24*3600*1000;
   const pct=Math.min(100,Math.max(0,(now-prev)/(t-prev)*100));
   $('#nowBar').style.width=`${pct}%`;
+  announceNext(next,t-now);
+}
+/* one atomic contextual status, announced only when the next event itself changes —
+   a live region ticking every 30s would just talk over the user */
+let announcedAt='';
+function announceNext(next,ms){
+  if(announcedAt===next.at) return;
+  announcedAt=next.at;
+  $('#nextStatus').textContent=`下一個行程：${next.title}，${stamp(next.at)}，${countdownText(ms)}`;
 }
 function updateClock(){
   const fmt=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false});
@@ -358,14 +379,27 @@ function updateClock(){
 }
 
 /* ── chrome ───────────────────────────────────────────────── */
-function showView(name){
-  $$('.tab').forEach(x=>x.classList.toggle('active',x.dataset.view===name));
+function showView(name,focusTab){
+  $$('.tab').forEach(x=>{
+    const on=x.dataset.view===name;
+    x.classList.toggle('active',on);
+    x.setAttribute('aria-selected',String(on));
+    x.tabIndex=on?0:-1;
+    if(on&&focusTab) x.focus();
+  });
   $$('.view').forEach(x=>x.classList.toggle('active',x.id===name));
 }
 function setupTabs(){
-  $$('.tab').forEach(b=>{
+  const tabs=$$('.tab');
+  tabs.forEach((b,i)=>{
     b.querySelector('.tab-ico').innerHTML=icon(b.dataset.icon);
     b.addEventListener('click',()=>{showView(b.dataset.view);window.scrollTo({top:0,behavior:'smooth'});});
+    b.addEventListener('keydown',e=>{
+      const step={ArrowRight:1,ArrowLeft:-1,Home:-i,End:tabs.length-1-i}[e.key];
+      if(step===undefined) return;
+      e.preventDefault();
+      showView(tabs[(i+step+tabs.length)%tabs.length].dataset.view,true);
+    });
   });
   $$('[data-icon]:not(.tab)').forEach(el=>{if(!el.querySelector('svg')) el.innerHTML=icon(el.dataset.icon);});
 }
