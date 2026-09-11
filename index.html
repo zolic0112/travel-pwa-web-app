@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#EBF0EF" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#08171C" media="(prefers-color-scheme: dark)" />
-  <meta name="description" content="2026 馬來西亞 6天5夜旅程助手：下一個行程、倒數、每日行程、風險與待辦" />
+  <meta name="description" content="2026 馬來西亞 6天5夜旅程助手：下一個行程、倒數、每日行程與出發前待辦" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -79,9 +79,9 @@
       <article class="vital flag">
         <span class="vital-icon" data-icon="alert" aria-hidden="true"></span>
         <div class="vital-body">
-          <span class="vital-label">最大風險</span>
-          <strong class="num">10/13 KUL</strong>
-          <small>分開機票轉機</small>
+          <span class="vital-label">關鍵截止</span>
+          <strong class="num">10/13 14:30</strong>
+          <small>BR228 關櫃</small>
         </div>
       </article>
       <article class="vital">
@@ -97,7 +97,6 @@
     <div class="tabs" role="tablist" aria-label="主要頁籤">
       <button class="tab active" role="tab" id="tab-itinerary" aria-controls="itinerary" aria-selected="true" tabindex="0" data-view="itinerary" data-icon="route"><span class="tab-ico" aria-hidden="true"></span><span class="tab-label">行程</span></button>
       <button class="tab" role="tab" id="tab-planner" aria-controls="planner" aria-selected="false" tabindex="-1" data-view="planner" data-icon="pin"><span class="tab-ico" aria-hidden="true"></span><span class="tab-label">每日規劃</span></button>
-      <button class="tab" role="tab" id="tab-risks" aria-controls="risks" aria-selected="false" tabindex="-1" data-view="risks" data-icon="shield"><span class="tab-ico" aria-hidden="true"></span><span class="tab-label">檢查</span></button>
       <button class="tab" role="tab" id="tab-todos" aria-controls="todos" aria-selected="false" tabindex="-1" data-view="todos" data-icon="check"><span class="tab-ico" aria-hidden="true"></span><span class="tab-label">待辦</span></button>
       <button class="tab" role="tab" id="tab-costs" aria-controls="costs" aria-selected="false" tabindex="-1" data-view="costs" data-icon="wallet"><span class="tab-ico" aria-hidden="true"></span><span class="tab-label">費用</span></button>
     </div>
@@ -122,11 +121,6 @@
         <strong>這天還沒有自訂行程</strong>
         <span>把餐廳、景點或集合時間加進來，就會和固定交通一起排序。</span>
       </div>
-    </section>
-
-    <section id="risks" class="view" role="tabpanel" aria-labelledby="tab-risks" tabindex="0">
-      <div class="section-head"><div><h2>邏輯檢查</h2><p>先看 P1，再處理 P2 / P3。</p></div></div>
-      <div id="riskList" class="stack grouped"></div>
     </section>
 
     <section id="todos" class="view" role="tabpanel" aria-labelledby="tab-todos" tabindex="0">
