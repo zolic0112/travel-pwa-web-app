@@ -22,6 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # A dropped custom-property declaration is silent in CSS and has shipped
+      # a square-cornered, serif-font build once already.
+      - run: node scripts/check-tokens.mjs
       - uses: actions/configure-pages@v5
         with:
           enablement: true

@@ -103,7 +103,8 @@ const ICO = {
   flag:P("<path d='M242.63,96.44l-184-64A8,8,0,0,0,48,40V216a8,8,0,0,0,16,0V173.69l178.63-62.13a8,8,0,0,0,0-15.12ZM64,156.75V51.25L215.65,104Z'/>"),
   sun:P("<path d='M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z'/>"),
   moon:P("<path d='M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z'/>"),
-  system:P("<path d='M208,40H48A24,24,0,0,0,24,64V176a24,24,0,0,0,24,24h72v16H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H136V200h72a24,24,0,0,0,24-24V64A24,24,0,0,0,208,40ZM48,56H208a8,8,0,0,1,8,8v80H40V64A8,8,0,0,1,48,56ZM208,184H48a8,8,0,0,1-8-8V160H216v16A8,8,0,0,1,208,184Z'/>")
+  system:P("<path d='M208,40H48A24,24,0,0,0,24,64V176a24,24,0,0,0,24,24h72v16H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H136V200h72a24,24,0,0,0,24-24V64A24,24,0,0,0,208,40ZM48,56H208a8,8,0,0,1,8,8v80H40V64A8,8,0,0,1,48,56ZM208,184H48a8,8,0,0,1-8-8V160H216v16A8,8,0,0,1,208,184Z'/>"),
+  plus:P("<path d='M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z'/>")
 };
 const TYPE_ICON={'高鐵':'train','轉乘':'transfer','航班':'plane','抵達':'pin','住宿':'bed','自由行':'sun','退房':'luggage','移動':'car','關鍵轉機':'alert','入境轉乘':'passport','景點':'camera','餐廳':'food','交通':'car','集合':'users','購物':'bag','其他':'dot','關鍵截止':'clock'};
 const TRANSPORT=new Set(['高鐵','轉乘','航班','移動','入境轉乘','關鍵轉機','交通']);
@@ -284,7 +285,7 @@ function setupPlanner(){
     const id=$('#planForm').dataset.editId || `${Date.now()}`;
     const item={id,date:$('#planDate').value,time:$('#planTime').value,title:$('#planTitle').value.trim(),type:$('#planType').value,duration:$('#planDuration').value.trim(),note:$('#planNote').value.trim()};
     const ix=plans.findIndex(x=>x.id===id); if(ix>=0) plans[ix]=item; else plans.push(item);
-    savePlans(plans); $('#planDialog').close();
+    savePlans(plans); $('#planDialog').close(); toast(ix>=0?'已更新行程':'已加入行程');
   });
   renderPlans();
 }
@@ -316,7 +317,9 @@ function renderPlans(){
       <button class="icon-btn delete-plan" data-id="${p.id}" aria-label="刪除">×</button>
     </div></article>`).join('');
   $$('.edit-plan').forEach(b=>b.onclick=()=>openPlanDialog(getPlans().find(x=>x.id===b.dataset.id)));
-  $$('.delete-plan').forEach(b=>b.onclick=()=>{if(confirm('刪除這筆自訂行程？')) savePlans(getPlans().filter(x=>x.id!==b.dataset.id));});
+  $$('.delete-plan').forEach(b=>b.onclick=()=>{
+    if(confirm('刪除這筆自訂行程？')){savePlans(getPlans().filter(x=>x.id!==b.dataset.id));toast('已刪除');}
+  });
 }
 
 /* ── next event & countdown ───────────────────────────────── */
@@ -422,8 +425,64 @@ function setupTheme(){
   });
 }
 
+/* ── app chrome ───────────────────────────────────────────── */
+function setupHeaderCollapse(){
+  const bar=$('.topbar');
+  let ticking=false;
+  addEventListener('scroll',()=>{
+    if(ticking) return;
+    ticking=true;
+    requestAnimationFrame(()=>{bar.classList.toggle('compact',scrollY>36);ticking=false;});
+  },{passive:true});
+}
+
+let toastTimer;
+function toast(msg){
+  const el=$('#toast');
+  el.textContent=msg;el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),2200);
+}
+
+/* Swiping between tabs is an addition, never the only way: the tab bar and
+   arrow keys still do everything this does. */
+function setupSwipe(){
+  const main=$('#main');
+  let x0=null,y0=null,lock=false;
+  main.addEventListener('touchstart',e=>{
+    if(e.touches.length!==1){x0=null;return;}
+    /* do not fight a horizontally scrollable strip or table under the finger */
+    lock=!!e.target.closest('.day-strip,.table-wrap,dialog');
+    x0=e.touches[0].clientX;y0=e.touches[0].clientY;
+  },{passive:true});
+  main.addEventListener('touchend',e=>{
+    if(x0===null||lock) return;
+    const dx=e.changedTouches[0].clientX-x0, dy=e.changedTouches[0].clientY-y0;
+    x0=null;
+    if(Math.abs(dx)<64||Math.abs(dy)>44) return;
+    const i=VIEW_ORDER.indexOf($('.view.active').id);
+    const next=i+(dx<0?1:-1);
+    if(next<0||next>=VIEW_ORDER.length) return;
+    showView(VIEW_ORDER[next]);
+  },{passive:true});
+}
+
+/* Opening on 10/08 is useless once the trip starts. Land on today when the
+   trip is running, otherwise on the day the next event belongs to. */
+function openingDay(){
+  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const ix=tripDates.indexOf(today);
+  if(ix>=0) return String(ix);
+  const next=getAllCountdownEvents().find(e=>new Date(e.at).getTime()>=Date.now());
+  return next&&next.day>=0?String(next.day):'all';
+}
+
 /* ── chrome ───────────────────────────────────────────────── */
+const VIEW_ORDER=['itinerary','planner','risks','todos','costs'];
 function showView(name,focusTab){
+  const from=VIEW_ORDER.indexOf($('.view.active')?.id), to=VIEW_ORDER.indexOf(name);
+  if(from>=0&&to>=0&&from!==to) document.documentElement.style.setProperty('--view-dir',(to>from?14:-14)+'px');
+  $('#addPlanFab').classList.toggle('show',name==='planner');
   $$('.tab').forEach(x=>{
     const on=x.dataset.view===name;
     x.classList.toggle('active',on);
@@ -487,6 +546,11 @@ $('#resetTodos').addEventListener('click',()=>{if(confirm('要清除所有待辦
 
 setupTheme();
 setupTabs();
+setupHeaderCollapse();
+setupSwipe();
+$('#addPlanFab').onclick=()=>openPlanDialog();
+dayFilter=openingDay();
+planFilter=dayFilter;
 dayChips(dayFilter,setDay,'#dayStrip');
 renderTimeline();
 renderRisks();
