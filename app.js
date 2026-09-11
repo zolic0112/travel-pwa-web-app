@@ -357,7 +357,7 @@ function updateNextEvent(){
     $('#nextMeta').textContent='所有固定倒數事件都已結束';
     $('#nextCountdown').innerHTML='<span class="cd-n">完成</span>';
     $('#nextAt').textContent='';$('#nextHint').textContent='';
-    $('#nowBar').style.width='100%';
+    $('#nowBar').style.transform='scaleX(1)';
     $('#nextIcon').innerHTML=ICO.check;
     return;
   }
@@ -376,7 +376,7 @@ function updateNextEvent(){
   if(key!==nextEventKey){nextEventKey=key;renderTimeline();}
   const prev=i>0?new Date(all[i-1].at).getTime():t-24*3600*1000;
   const pct=Math.min(100,Math.max(0,(now-prev)/(t-prev)*100));
-  $('#nowBar').style.width=`${pct}%`;
+  $('#nowBar').style.transform=`scaleX(${pct/100})`;
   announceNext(next,t-now);
 }
 /* one atomic contextual status, announced only when the next event itself changes —
@@ -428,11 +428,17 @@ function setupTheme(){
 /* ── app chrome ───────────────────────────────────────────── */
 function setupHeaderCollapse(){
   const bar=$('.topbar');
-  let ticking=false;
+  let last=0,ticking=false;
   addEventListener('scroll',()=>{
     if(ticking) return;
     ticking=true;
-    requestAnimationFrame(()=>{bar.classList.toggle('compact',scrollY>36);ticking=false;});
+    requestAnimationFrame(()=>{
+      const y=Math.max(0,scrollY);
+      /* hide on the way down, bring it straight back on any upward move */
+      if(y>96&&y>last+4) bar.classList.add('hidden');
+      else if(y<last-4||y<=96) bar.classList.remove('hidden');
+      last=y;ticking=false;
+    });
   },{passive:true});
 }
 
