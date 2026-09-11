@@ -423,7 +423,18 @@ function setupBanner(){
   $('#dismissBanner').onclick=()=>{$('#criticalBanner').hidden=true;try{sessionStorage.setItem(key,'1')}catch{}};
 }
 function setupPWA(){
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+  if('serviceWorker' in navigator){
+    /* A new worker claiming this page means its assets are stale. Reload once so
+       the update lands without the user having to know to hard-refresh. Skipped
+       on first install, where claiming is expected and nothing is stale. */
+    const hadController=!!navigator.serviceWorker.controller;
+    let reloaded=false;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      if(!hadController||reloaded) return;
+      reloaded=true;location.reload();
+    });
+    navigator.serviceWorker.register('./sw.js');
+  }
   let promptEvent=null; const btn=$('#installBtn');
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();promptEvent=e;btn.hidden=false;});
   btn.addEventListener('click',async()=>{if(!promptEvent)return;promptEvent.prompt();await promptEvent.userChoice;promptEvent=null;btn.hidden=true;});
