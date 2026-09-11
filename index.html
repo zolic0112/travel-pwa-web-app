@@ -11,7 +11,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" />
   <link rel="stylesheet" href="styles.css" />
   <title>馬來西亞 6天5夜</title>
 </head>
@@ -103,7 +103,7 @@
         <button id="addPlanBtn" class="btn primary">＋ 新增</button>
       </div>
       <div class="day-strip" id="planDayStrip" role="group" aria-label="規劃日期"></div>
-      <div id="planList" class="stack"></div>
+      <div id="planList" class="stack grouped"></div>
       <div id="planEmpty" class="empty-state" hidden>
         <span class="empty-icon" data-icon="pin" aria-hidden="true"></span>
         <strong>這天還沒有自訂行程</strong>
@@ -113,7 +113,7 @@
 
     <section id="risks" class="view" role="tabpanel" aria-labelledby="tab-risks" tabindex="0">
       <div class="section-head"><div><h2>邏輯檢查</h2><p>先看 P1，再處理 P2 / P3。</p></div></div>
-      <div id="riskList" class="stack"></div>
+      <div id="riskList" class="stack grouped"></div>
     </section>
 
     <section id="todos" class="view" role="tabpanel" aria-labelledby="tab-todos" tabindex="0">
@@ -132,7 +132,7 @@
         </div>
         <button id="resetTodos" class="btn quiet">重設</button>
       </div>
-      <div id="todoList" class="stack"></div>
+      <div id="todoList" class="stack grouped"></div>
     </section>
 
     <section id="costs" class="view" role="tabpanel" aria-labelledby="tab-costs" tabindex="0">
