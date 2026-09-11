@@ -176,17 +176,9 @@ svg{display:block}
 }
 .eyebrow{font-size:11px;letter-spacing:.1em;color:var(--brand);font-weight:900;font-family:var(--mono)}
 .topbar h1{font-size:var(--t-display);font-weight:900;margin-top:4px;line-height:1.15}
-.topbar{transition:padding .22s var(--ease-out)}
-.route-strip{
-  display:flex;align-items:center;gap:6px;margin-top:7px;font-size:11px;font-weight:600;color:var(--muted);
-  overflow:hidden;transition:max-height .22s var(--ease-out),opacity .18s,margin-top .22s var(--ease-out);
-  max-height:20px;
-}
-.topbar h1{transition:font-size .22s var(--ease-out)}
-.topbar.compact{padding-top:9px;padding-bottom:9px}
-.topbar.compact .route-strip{max-height:0;opacity:0;margin-top:0}
-.topbar.compact h1{font-size:19px}
-.topbar.compact .eyebrow{display:none}
+.topbar{transition:transform .24s var(--ease-out)}
+.topbar.hidden{transform:translateY(-100%)}
+.route-strip{display:flex;align-items:center;gap:6px;margin-top:7px;font-size:11px;font-weight:600;color:var(--muted)}
 .route-strip span{letter-spacing:.06em}
 .route-strip i{width:14px;height:1px;background:var(--line);flex:none}
 .topbar-actions{display:flex;align-items:center;gap:9px;flex:none}
@@ -238,7 +230,7 @@ main{max-width:1000px;margin:auto;padding:18px 20px 120px}
 .countdown .cd-u{font-size:12px;margin:0 6px 0 2px;color:var(--on-ink-dim)}
 .count-label{font-size:10.5px;color:var(--on-ink-dim);margin-top:3px}
 .now-bar{height:3px;border-radius:var(--r-pill);background:rgba(255,255,255,.12);margin-top:13px;overflow:hidden;position:relative}
-.now-bar i{display:block;height:100%;width:0;border-radius:var(--r-pill);background:linear-gradient(90deg,var(--brand),#F0B45C);transition:width .5s ease}
+.now-bar i{display:block;height:100%;width:100%;border-radius:var(--r-pill);background:linear-gradient(90deg,var(--brand),#F0B45C);transform:scaleX(0);transform-origin:left;transition:transform .5s ease}
 .now-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px;position:relative}
 .now-hint{font-size:11px;color:var(--on-ink-dim);text-align:right}
 
@@ -646,13 +638,16 @@ dialog::backdrop{background:rgba(6,20,26,.6);backdrop-filter:blur(3px)}
   }
   .tab-ico svg{width:21px;height:21px}
   .tab.active{background:transparent;box-shadow:none;color:var(--brand)}
-  .tab.active .tab-ico{
-    background:var(--brand-soft);border-radius:var(--r-pill);
-    padding:2px 13px;margin-bottom:-1px;
+  /* The pill is always this size and only its fill changes, so selecting a tab
+     never resizes the icon box or nudges the label under it. */
+  .tab-ico{
+    width:46px;height:26px;border-radius:var(--r-pill);
+    background:transparent;
+    transition:background .18s,transform .12s var(--ease-out);
   }
+  .tab.active .tab-ico{background:var(--brand-soft)}
   .tab:active{background:transparent}
   .tab:active .tab-ico{transform:scale(.92)}
-  .tab-ico{transition:transform .12s var(--ease-out),background .18s,padding .18s var(--ease-out)}
   .section-head{align-items:center}
   .section-head h2{font-size:17px}
   .tl-row{grid-template-columns:50px 28px 1fr}
