@@ -179,6 +179,7 @@ svg{display:block}
   background:var(--brand);color:var(--on-brand);font-weight:700;font-size:13px;
   padding:11px 16px;border-radius:var(--r-md);box-shadow:var(--shadow-md);
 }
+.skip-link{min-height:44px;display:inline-flex;align-items:center}
 .skip-link:focus{transform:none}
 /* it takes focus programmatically; never paint a ring around the whole page */
 #main:focus{outline:none}
@@ -189,6 +190,8 @@ svg{display:block}
   font:inherit;font-weight:700;font-size:13px;
   border:1px solid transparent;border-radius:var(--r-md);
   padding:9px 14px;cursor:pointer;white-space:nowrap;
+  /* every button is at least a fingertip tall */
+  min-height:44px;display:inline-flex;align-items:center;justify-content:center;
   transition:background .15s,border-color .15s,transform .1s;
 }
 .btn:active{transform:translateY(1px)}
@@ -222,7 +225,10 @@ svg{display:block}
   border:0;background:transparent;color:var(--muted);cursor:pointer;
   min-width:38px;min-height:38px;display:grid;place-items:center;
   border-radius:var(--r-sm);transition:background .15s,color .15s;padding:0;
+  position:relative;
 }
+/* the painted box stays small; the finger gets the full 44px either side of it */
+.theme-opt::after{content:"";position:absolute;inset:-3px -5px;}
 .theme-opt svg{width:17px;height:17px}
 .theme-opt:active{background:var(--surface-2)}
 .theme-opt[aria-checked="true"]{background:var(--bar-active);color:var(--brand);box-shadow:var(--shadow-sm)}
@@ -545,11 +551,20 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
   bottom:calc(22px + env(safe-area-inset-bottom));
   background:var(--ink);color:var(--on-ink);border:1px solid rgba(255,255,255,.12);
   border-radius:var(--r-pill);padding:10px 18px;font-size:13px;font-weight:700;
-  max-width:calc(100vw - 40px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:calc(100vw - 32px);overflow:hidden;
   box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;
   transition:opacity .2s,transform .2s var(--ease-out);
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* only the undo button takes taps; the pill itself must not swallow them */
+#toastText{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.toast.has-action{pointer-events:auto;display:flex;align-items:center;gap:12px;padding-right:6px}
+#toastAction{
+  border:0;background:rgba(255,255,255,.16);color:var(--on-ink);
+  font:inherit;font-size:12.5px;font-weight:800;cursor:pointer;
+  border-radius:var(--r-pill);padding:7px 14px;min-height:34px;flex:none;
+}
+#toastAction:active{background:rgba(255,255,255,.28)}
 
 .fab{
   display:none;position:fixed;z-index:var(--z-banner);
@@ -587,7 +602,21 @@ dialog{
   width:min(680px,calc(100% - 28px));border:1px solid var(--line);
   border-radius:var(--r-xl);padding:0;background:var(--surface);color:var(--text);
   box-shadow:var(--shadow-lg);
+  /* dvh, not vh: with vh the dialog is sized to the viewport the browser
+     chrome is hiding, so the bottom of it sits under the address bar. */
+  max-height:calc(100dvh - 28px);
+  overflow:hidden;
 }
+/* [open] matters: a bare `dialog{display:flex}` beats the UA sheet's
+   `dialog:not([open]){display:none}` and leaves every closed dialog on
+   screen, swallowing taps meant for the page underneath. */
+dialog[open]{display:flex;flex-direction:column}
+#planForm{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+/* the on-screen keyboard eats most of the screen; the fields scroll under a
+   header and an action row that stay put, so 儲存 is never out of reach */
+.dialog-head{flex:none}
+.form-grid{overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.dialog-actions{flex:none;background:var(--surface);border-top:1px solid var(--line-soft)}
 dialog::backdrop{background:rgba(6,20,26,.6);backdrop-filter:blur(3px)}
 .dialog-head{display:flex;justify-content:space-between;align-items:center;padding:15px 18px;border-bottom:1px solid var(--line-soft)}
 .dialog-head h2{font-size:16px;font-weight:900}
@@ -596,16 +625,22 @@ dialog::backdrop{background:rgba(6,20,26,.6);backdrop-filter:blur(3px)}
 .form-grid label{font-size:11.5px;font-weight:800;color:var(--muted);display:grid;gap:5px}
 .form-grid .full{grid-column:1/-1}
 .form-grid input,.form-grid select,.form-grid textarea{
-  width:100%;border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;
-  font:inherit;font-size:13px;font-weight:400;color:var(--text);background:var(--surface-2);
+  width:100%;border:1px solid var(--line);border-radius:var(--r-sm);padding:11px;min-height:44px;
+  /* 16px exactly: iOS Safari zooms the whole page into any field below it,
+     and the zoom does not come back when the field blurs. Capping the
+     viewport instead would fix it by banning pinch zoom, which fails
+     WCAG 1.4.4. */
+  font:inherit;font-size:16px;font-weight:400;color:var(--text);background:var(--surface-2);
 }
 .form-grid input:focus,.form-grid select:focus,.form-grid textarea:focus{border-color:var(--brand);outline:none;box-shadow:0 0 0 3px var(--brand-soft)}
-.dialog-actions{padding:2px 18px 18px;display:flex;justify-content:flex-end;gap:8px}
-.source-list{padding:14px 18px 18px;display:grid;gap:11px;max-height:70vh;overflow-y:auto}
+.dialog-actions{padding:12px 18px calc(12px + env(safe-area-inset-bottom));display:flex;justify-content:flex-end;gap:8px}
+.source-list{padding:14px 18px calc(18px + env(safe-area-inset-bottom));display:grid;gap:11px;
+  overflow-y:auto;min-height:0;overscroll-behavior:contain}
 .source{font-size:12.5px;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r-sm);padding:10px 12px}
 .source strong{font-size:12.5px}
 .source small{display:block;color:var(--muted);margin:2px 0 4px}
-.source a{color:var(--brand);word-break:break-all;font-size:11px;font-family:var(--mono)}
+.source a{color:var(--brand);word-break:break-all;font-size:11px;font-family:var(--mono);
+  display:block;padding:8px 0;min-height:44px}
 
 /* ── mobile ───────────────────────────────────────────────── */
 @media (max-width:760px){
@@ -613,6 +648,7 @@ dialog::backdrop{background:rgba(6,20,26,.6);backdrop-filter:blur(3px)}
   .brand-block{min-width:0}
   .topbar h1{font-size:20px}
   .theme-opt{min-width:34px;min-height:34px}
+  .theme-opt::after{inset:-5px}
   .theme-opt svg{width:16px;height:16px}
   .topbar-actions{flex-direction:column;align-items:flex-end;gap:7px}
   .topbar h1{font-size:19px}
@@ -660,7 +696,9 @@ dialog::backdrop{background:rgba(6,20,26,.6);backdrop-filter:blur(3px)}
   .form-grid{grid-template-columns:1fr}
   .form-grid .full{grid-column:auto}
   .critical-banner{bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 10px);padding:10px 11px;font-size:12px}
-  .toast{bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 16px)}
+  /* clear of both the FAB and the alert banner, which share this corner —
+     one fixed height every time beats a pill that sometimes lands on them */
+  .toast{bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 84px)}
   html{scroll-padding-top:96px;scroll-padding-bottom:calc(var(--tabbar-h) + 60px)}
   .cb-text span{font-size:11.5px}
   /* the footer sits outside main, so it needs its own clearance for the bar */

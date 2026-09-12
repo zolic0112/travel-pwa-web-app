@@ -320,6 +320,67 @@ console.log('\n── every control does what it says ──');
   await ctx.close();
 }
 
+console.log('\n── it behaves like an app on a phone, not like a web page ──');
+{
+  const { page, ctx, errs } = await open();
+  const val = fn => page.evaluate(fn);
+
+  /* iOS zooms the whole page into any focused field under 16px and does not
+     zoom back out when it blurs. This is the one that shipped. */
+  await page.click('.tab[data-view="planner"]'); await page.waitForTimeout(250);
+  await page.click('#addPlanFab'); await page.waitForTimeout(400);
+  const small = await val(() => [...document.querySelectorAll('#planForm input,#planForm select,#planForm textarea')]
+    .map(e => ({ id: e.id, px: parseFloat(getComputedStyle(e).fontSize) })).filter(x => x.px < 16));
+  check('no text field is small enough to trigger iOS zoom', small.length === 0, JSON.stringify(small));
+
+  check('text fields do not invite autocorrect or spellcheck squiggles',
+    await val(() => [...document.querySelectorAll('#planTitle,#planDuration,#planNote')]
+      .every(e => e.getAttribute('spellcheck') === 'false' && e.getAttribute('autocorrect') === 'off'
+        && e.getAttribute('autocomplete') === 'off' && e.getAttribute('enterkeyhint'))));
+
+  /* the on-screen keyboard leaves roughly this much room on a small phone */
+  await page.setViewportSize({ width: 390, height: 380 }); await page.waitForTimeout(350);
+  const reach = await val(() => {
+    const r = document.querySelector('#planDialog button[value="default"]').getBoundingClientRect();
+    return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight };
+  });
+  check('儲存 stays reachable with the keyboard open', reach.bottom <= reach.vh && reach.top >= 0, JSON.stringify(reach));
+  await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(250);
+  await val(() => document.querySelector('#planDialog').close()); await page.waitForTimeout(250);
+
+  /* a bare dialog{display:flex} beats the UA's dialog:not([open]){display:none}
+     and leaves closed dialogs over the page, eating taps */
+  check('a closed dialog is out of the way', await val(() =>
+    [...document.querySelectorAll('dialog:not([open])')].every(d => getComputedStyle(d).display === 'none')));
+
+  check('no browser confirm() or alert() interrupts a tap', await val(() => {
+    let hit = false;
+    const spy = () => { hit = true; return true; };
+    const [c, a] = [window.confirm, window.alert];
+    window.confirm = spy; window.alert = spy;
+    document.querySelector('#resetTodos').click();
+    window.confirm = c; window.alert = a;
+    return !hit;
+  }));
+
+  const tiny = [];
+  for (const v of ['itinerary', 'planner', 'todos', 'costs']) {
+    await page.click(`.tab[data-view="${v}"]`); await page.waitForTimeout(250);
+    tiny.push(...await val(() => [...document.querySelectorAll('button,a[href],select,label.todo,[data-copy]')]
+      .filter(e => e.getBoundingClientRect().width > 0)
+      .map(e => { const r = e.getBoundingClientRect(), a = getComputedStyle(e, '::after');
+        const ax = parseFloat(a.insetInlineStart) || 0, ay = parseFloat(a.insetBlockStart) || 0;
+        return { t: (e.id || e.className || e.tagName).toString().slice(0, 20),
+          w: Math.round(r.width + (ax < 0 ? -2 * ax : 0)), h: Math.round(r.height + (ay < 0 ? -2 * ay : 0)) }; })
+      .filter(x => x.w < 44 || x.h < 44)));
+  }
+  check('every control is at least a fingertip across', tiny.length === 0,
+    JSON.stringify([...new Map(tiny.map(t => [t.t, t])).values()].slice(0, 6)));
+
+  check('no errors', !errs.length, errs[0] || '');
+  await ctx.close();
+}
+
 console.log('\n── the app carries no knowledge of one particular trip ──');
 {
   /* a different country, currency, party size, time zone and vocabulary,

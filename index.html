@@ -137,7 +137,10 @@
   </main>
 
   <button id="addPlanFab" class="fab" data-icon="plus" aria-label="新增行程"></button>
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite">
+    <span id="toastText"></span>
+    <button type="button" id="toastAction" hidden></button>
+  </div>
 
   <aside id="criticalBanner" class="critical-banner">
     <span class="cb-icon" data-icon="alert" aria-hidden="true"></span>
@@ -158,11 +161,14 @@
       <div class="dialog-head"><h2 id="planDialogTitle">新增行程</h2><button type="button" id="closePlan" aria-label="關閉">×</button></div>
       <div class="form-grid">
         <label>日期<select id="planDate" required></select></label>
-        <label>時間<input id="planTime" type="time" required /></label>
-        <label class="full">名稱<input id="planTitle" type="text" maxlength="60" placeholder="例如：亞羅街晚餐" required /></label>
+        <label>時間<input id="planTime" type="time" required autocomplete="off" /></label>
+        <label class="full">名稱<input id="planTitle" type="text" maxlength="60" placeholder="例如：亞羅街晚餐" required
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next" /></label>
         <label>類型<select id="planType"></select></label>
-        <label>預估時間<input id="planDuration" type="text" maxlength="30" placeholder="例如 90 分鐘" /></label>
-        <label class="full">地點 / 備註<textarea id="planNote" rows="3" maxlength="220" placeholder="地址、訂位資訊、集合點或提醒"></textarea></label>
+        <label>預估時間<input id="planDuration" type="text" maxlength="30" placeholder="例如 90 分鐘"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next" /></label>
+        <label class="full">地點 / 備註<textarea id="planNote" rows="3" maxlength="220" placeholder="地址、訂位資訊、集合點或提醒"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"></textarea></label>
       </div>
       <div class="dialog-actions"><button type="button" class="btn quiet" id="cancelPlan">取消</button><button class="btn primary" value="default">儲存</button></div>
     </form>

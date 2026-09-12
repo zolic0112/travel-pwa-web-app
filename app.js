@@ -264,7 +264,10 @@ function renderPlans(){
     </div></article>`).join('');
   $$('.edit-plan').forEach(b=>b.onclick=()=>openPlanDialog(getPlans().find(x=>x.id===b.dataset.id)));
   $$('.delete-plan').forEach(b=>b.onclick=()=>{
-    if(confirm('刪除這筆自訂行程？')){savePlans(getPlans().filter(x=>x.id!==b.dataset.id));toast('已刪除');}
+    const gone=getPlans().find(x=>x.id===b.dataset.id);
+    if(!gone) return;
+    savePlans(getPlans().filter(x=>x.id!==gone.id));
+    toast('已刪除行程',{label:'復原',fn(){savePlans([...getPlans(),gone]);toast('已復原');}});
   });
 }
 
@@ -413,11 +416,18 @@ function setupHeaderCollapse(){
 }
 
 let toastTimer;
-function toast(msg){
-  const el=$('#toast');
-  el.textContent=msg;el.classList.add('show');
+/* An optional action turns the toast into the undo that replaces a browser
+   confirm(): the destructive thing happens at once and can be taken back,
+   instead of a modal carrying the site's domain interrupting every tap. */
+function toast(msg,action){
+  const el=$('#toast'), btn=$('#toastAction');
+  $('#toastText').textContent=msg;
+  btn.hidden=!action;
+  if(action){ btn.textContent=action.label; btn.onclick=()=>{el.classList.remove('show');action.fn();}; }
+  el.classList.toggle('has-action',!!action);
+  el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>el.classList.remove('show'),2200);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),action?5000:2200);
 }
 
 /* Swiping between tabs is an addition, never the only way: the tab bar and
@@ -562,7 +572,16 @@ function setupPWA(){
   btn.addEventListener('click',async()=>{if(!promptEvent)return;promptEvent.prompt();await promptEvent.userChoice;promptEvent=null;btn.hidden=true;});
   window.addEventListener('appinstalled',()=>btn.hidden=true);
 }
-$('#resetTodos').addEventListener('click',()=>{if(confirm('要清除所有待辦勾選狀態嗎？')){localStorage.removeItem(todoKey);renderTodos();}});
+$('#resetTodos').addEventListener('click',()=>{
+  const before=getTodoState();
+  if(!Object.values(before).some(Boolean)){toast('目前沒有勾選項目');return;}
+  try{localStorage.removeItem(todoKey)}catch{}
+  renderTodos();
+  toast('已清除全部勾選',{label:'復原',fn(){
+    try{localStorage.setItem(todoKey,JSON.stringify(before))}catch{toast('無法復原，裝置儲存空間已滿');return;}
+    renderTodos();toast('已復原');
+  }});
+});
 
 setupChrome();
 setupTheme();
