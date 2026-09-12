@@ -121,6 +121,7 @@ html{-webkit-text-size-adjust:100%;scroll-padding-top:152px;scroll-padding-botto
 @media (max-width:760px){html{scroll-padding-top:138px}}
 body{
   margin:0;min-height:100dvh;
+  display:flex;flex-direction:column;
   font-family:var(--sans);
   color:var(--text);
   background:var(--paper);
@@ -196,9 +197,10 @@ svg{display:block}
 .theme-opt:active{background:var(--surface-2)}
 .theme-opt[aria-checked="true"]{background:var(--surface);color:var(--brand);box-shadow:var(--shadow-sm)}
 
-main{max-width:1000px;margin:auto;padding:18px 20px 120px}
+main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1}
 
 /* ── next-event panel ─────────────────────────────────────── */
+.view .now-panel{margin-bottom:4px}
 .now-panel{
   background:linear-gradient(158deg,var(--ink-2) 0%,var(--ink) 72%);
   color:var(--on-ink);
@@ -233,23 +235,6 @@ main{max-width:1000px;margin:auto;padding:18px 20px 120px}
 .now-bar i{display:block;height:100%;width:100%;border-radius:var(--r-pill);background:linear-gradient(90deg,var(--brand),#F0B45C);transform:scaleX(0);transform-origin:left;transition:transform .5s ease}
 .now-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px;position:relative}
 .now-hint{font-size:11px;color:var(--on-ink-dim);text-align:right}
-
-/* ── vitals ───────────────────────────────────────────────── */
-.vitals{
-  display:grid;grid-template-columns:1fr 1.25fr 1fr;margin-top:12px;
-  background:var(--surface);border:1px solid var(--line);
-  border-radius:var(--r-lg);box-shadow:var(--shadow-sm);overflow:hidden;
-}
-.vital{display:flex;gap:11px;align-items:center;padding:13px 15px;border-left:1px solid var(--line-soft)}
-.vital:first-child{border-left:0}
-.vital-icon{width:32px;height:32px;flex:none;border-radius:var(--r-sm);display:grid;place-items:center;background:var(--brand-soft);color:var(--brand)}
-.vital-icon svg{width:17px;height:17px}
-.vital-label{display:block;font-size:11px;color:var(--muted);font-weight:700}
-.vital-body strong{display:block;font-size:19px;font-weight:600;margin:2px 0 1px;letter-spacing:-.02em}
-.vital-body small{display:block;font-size:11px;color:var(--muted)}
-.vital.flag{background:var(--danger-soft)}
-.vital.flag .vital-icon{background:color-mix(in srgb,var(--danger) 16%,transparent);color:var(--danger)}
-.vital.flag .vital-body strong{color:var(--danger)}
 
 /* ── tabs ─────────────────────────────────────────────────── */
 .tabs{
@@ -389,6 +374,7 @@ main{max-width:1000px;margin:auto;padding:18px 20px 120px}
 
 /* ── generic stacks ──────────────────────────────────────── */
 .stack{display:grid;gap:9px}
+.stack.grouped:empty{display:none}
 /* one container with rules between rows, instead of N floating cards */
 .stack.grouped{
   display:block;gap:0;background:var(--surface);
@@ -536,7 +522,7 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
   display:grid;grid-template-columns:auto 1fr auto;gap:11px;align-items:center;
   box-shadow:0 12px 38px rgba(50,10,6,.35);font-size:12.5px;
 }
-.critical-banner[hidden]{display:none}
+.critical-banner[hidden],.critical-banner.off-view{display:none}
 .cb-icon{width:28px;height:28px;border-radius:var(--r-sm);background:rgba(255,255,255,.11);display:grid;place-items:center;color:#FFC9C1;flex:none}
 .cb-icon svg{width:15px;height:15px}
 .cb-text strong{display:block;font-size:12px;font-weight:900;letter-spacing:.02em}
@@ -544,7 +530,7 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
 .cb-close{border:0;background:transparent;color:#FFC9C1;font-size:20px;line-height:1;cursor:pointer;min-width:44px;min-height:44px;display:grid;place-items:center;border-radius:var(--r-sm)}
 .cb-close:hover{background:rgba(255,255,255,.1)}
 
-footer{max-width:1000px;margin:22px auto 0;padding:0 20px 24px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:11.5px}
+footer{width:100%;max-width:1000px;margin:22px auto 0;padding:0 20px 24px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:11.5px}
 
 /* ── dialogs ──────────────────────────────────────────────── */
 dialog{
@@ -582,15 +568,6 @@ dialog::backdrop{background:rgba(6,20,26,.6);backdrop-filter:blur(3px)}
   .topbar-actions{flex-direction:column;align-items:flex-end;gap:7px}
   .topbar h1{font-size:19px}
   main{padding:14px 16px calc(var(--tabbar-h) + 40px)}
-  .vitals{grid-template-columns:1fr;gap:0}
-  .vital{align-items:center;padding:11px 13px;gap:10px;border-left:0;border-top:1px solid var(--line-soft)}
-  .vital:first-child{border-top:0}
-  .vital-icon{width:28px;height:28px;border-radius:var(--r-sm)}
-  .vital-icon svg{width:15px;height:15px}
-  .vital-body{display:grid;grid-template-columns:1fr auto;column-gap:12px;align-items:center;flex:1}
-  .vital-label{grid-column:1;grid-row:1}
-  .vital-body strong{grid-column:2;grid-row:1/3;font-size:16px;margin:0;text-align:right}
-  .vital-body small{grid-column:1;grid-row:2}
   .now-main{grid-template-columns:auto 1fr;row-gap:12px}
   .now-count{grid-column:1/-1;text-align:left;display:flex;align-items:baseline;gap:10px}
   .count-label{margin-top:0}
@@ -637,5 +614,7 @@ dialog::backdrop{background:rgba(6,20,26,.6);backdrop-filter:blur(3px)}
   .toast{bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 16px)}
   html{scroll-padding-top:96px;scroll-padding-bottom:calc(var(--tabbar-h) + 60px)}
   .cb-text span{font-size:11.5px}
-  footer{flex-direction:column;gap:7px;align-items:flex-start}
+  /* the footer sits outside main, so it needs its own clearance for the bar */
+  footer{flex-direction:column;gap:7px;align-items:flex-start;
+    padding-bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 20px)}
 }
