@@ -34,7 +34,8 @@ const check = (name, ok, detail = '') => {
 };
 
 const browser = await chromium.launch(EXEC ? { executablePath: EXEC } : {});
-const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true };
+const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
+  permissions: ['clipboard-read', 'clipboard-write'] };
 
 const open = async (opts = {}) => {
   const ctx = await browser.newContext({ ...phone, ...opts.context });
@@ -176,6 +177,126 @@ console.log('\n── the shell holds together ──');
   check('no horizontal overflow', (await page.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0);
   check('no errors', !errs.length, errs[0] || '');
+  await ctx.close();
+}
+
+console.log('\n── every control does what it says ──');
+{
+  /* This section exists because 查看行程 sat there for weeks doing nothing:
+     it scrolled to #itinerary, which is where the app already was. A control
+     that looks live and is not is worse than one that is missing. */
+  const { page, ctx, errs } = await open({ clock: '2026-10-10T13:00:00+08:00' });
+  page.on('dialog', d => d.accept());
+  const val = fn => page.evaluate(fn);
+
+  await val(() => scrollTo(0, 0)); await page.waitForTimeout(200);
+  await page.click('#jumpNextBtn'); await page.waitForTimeout(1200);
+  const jump = await val(() => ({ y: scrollY, top: document.querySelector('.tl-row.is-next')?.getBoundingClientRect().top }));
+  check('查看行程 scrolls to the row the countdown is about', jump.y > 0 && jump.top > 0 && jump.top < 300, JSON.stringify(jump));
+
+  /* the skip link needs a focusable target, or it moves nothing */
+  await val(() => document.querySelector('.skip-link').click()); await page.waitForTimeout(250);
+  check('the skip link moves focus into main', (await val(() => document.activeElement?.id)) === 'main');
+
+  for (const v of ['planner', 'todos', 'costs', 'itinerary']) {
+    await page.click(`.tab[data-view="${v}"]`); await page.waitForTimeout(250);
+    const s = await val(() => ({ view: document.querySelector('.view.active').id,
+      fab: document.querySelector('#addPlanFab').classList.contains('show') }));
+    check(`the ${v} tab shows ${v}, with the FAB only on the planner`, s.view === v && s.fab === (v === 'planner'), JSON.stringify(s));
+  }
+
+  await page.click('.tab[data-view="itinerary"]'); await page.waitForTimeout(250);
+  for (const [pick, groups] of [['all', 6], ['0', 1], ['5', 1]]) {
+    await page.click(`#dayStrip .day-chip[data-pick="${pick}"]`); await page.waitForTimeout(300);
+    const s = await val(() => ({ groups: document.querySelectorAll('.day-group').length,
+      a: document.querySelector('#dayStrip .day-chip.active')?.dataset.pick,
+      b: document.querySelector('#planDayStrip .day-chip.active')?.dataset.pick }));
+    check(`day ${pick} filters the timeline and both strips agree`, s.groups === groups && s.a === pick && s.b === pick, JSON.stringify(s));
+  }
+
+  await page.click('#dayStrip .day-chip[data-pick="all"]'); await page.waitForTimeout(300);
+  const want = await val(() => document.querySelector('.copy-chip')?.dataset.copy);
+  await page.click('.copy-chip'); await page.waitForTimeout(400);
+  const copied = await val(async () => ({ clip: await navigator.clipboard.readText(),
+    toast: document.querySelector('#toast').classList.contains('show') }));
+  check('a copy chip copies and says so', copied.clip === want && copied.toast, JSON.stringify(copied));
+
+  await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(250);
+  await page.click('#todoList .todo:nth-of-type(1)'); await page.waitForTimeout(350);
+  check('ticking a to-do moves the ring', (await val(() => document.querySelector('#todoPercent').textContent)) !== '0%');
+  await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForTimeout(700);
+  await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(250);
+  check('the tick survives a reload', (await val(() => document.querySelectorAll('#todoList input:checked').length)) === 1);
+  await page.click('#resetTodos'); await page.waitForTimeout(400);
+  check('reset clears every tick', (await val(() => document.querySelector('#todoPercent').textContent)) === '0%');
+
+  for (const t of ['dark', 'light', 'system']) {
+    await page.click(`.theme-opt[data-theme-set="${t}"]`); await page.waitForTimeout(300);
+    const s = await val(() => ({ attr: document.documentElement.getAttribute('data-theme'),
+      checked: document.querySelector('.theme-opt[aria-checked=true]')?.dataset.themeSet,
+      metas: document.querySelectorAll('meta[name=theme-color]').length }));
+    check(`the ${t} theme applies and leaves one theme-color`, s.checked === t && s.metas === 1
+      && (t === 'system' ? s.attr === null : s.attr === t), JSON.stringify(s));
+  }
+  await page.click('.theme-opt[data-theme-set="dark"]'); await page.waitForTimeout(250);
+  await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForTimeout(700);
+  check('the theme survives a reload', (await val(() => document.documentElement.getAttribute('data-theme'))) === 'dark');
+
+  await page.click('.tab[data-view="itinerary"]'); await page.waitForTimeout(250);
+  await page.click('#dismissBanner'); await page.waitForTimeout(250);
+  check('the alert can be dismissed', (await val(() => document.querySelector('#criticalBanner').hidden)) === true);
+  await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForTimeout(700);
+  check('and stays dismissed for the session', (await val(() => document.querySelector('#criticalBanner').hidden)) === true);
+
+  await page.click('#sourceBtn'); await page.waitForTimeout(350);
+  const src = await val(() => ({ open: document.querySelector('#sourceDialog').open,
+    n: document.querySelectorAll('#sourceList .source').length,
+    links: [...document.querySelectorAll('#sourceList a')].every(a => /^https?:/.test(a.href) && a.target === '_blank') }));
+  check('the sources dialog opens with working links', src.open && src.n > 0 && src.links, JSON.stringify(src));
+  await page.keyboard.press('Escape'); await page.waitForTimeout(250);
+  check('Escape closes it', (await val(() => document.querySelector('#sourceDialog').open)) === false);
+
+  await page.click('.tab[data-view="itinerary"]'); await page.waitForTimeout(200);
+  await page.focus('.tab[data-view="itinerary"]');
+  await page.keyboard.press('ArrowRight'); await page.waitForTimeout(250);
+  check('arrow keys move between tabs', (await val(() => document.querySelector('.view.active').id)) === 'planner');
+  await page.keyboard.press('End'); await page.waitForTimeout(250);
+  check('End reaches the last tab', (await val(() => document.querySelector('.view.active').id)) === 'costs');
+  await page.keyboard.press('Home'); await page.waitForTimeout(250);
+  check('Home reaches the first', (await val(() => document.querySelector('.view.active').id)) === 'itinerary');
+
+  const swipe = async dx => { await page.evaluate(d => {
+    const m = document.querySelector('#main');
+    const fire = (n, x) => m.dispatchEvent(new TouchEvent(n, { bubbles: true, cancelable: true,
+      [n === 'touchend' ? 'changedTouches' : 'touches']: [new Touch({ identifier: 1, target: m, clientX: x, clientY: 400 })] }));
+    fire('touchstart', 200); fire('touchend', 200 + d);
+  }, dx); await page.waitForTimeout(320); };
+  await swipe(-120);
+  check('swiping left moves one tab along', (await val(() => document.querySelector('.view.active').id)) === 'planner');
+  await swipe(120); await swipe(120);
+  check('swiping past the first tab stays put', (await val(() => document.querySelector('.view.active').id)) === 'itinerary');
+  await swipe(-20);
+  check('a small drag is not a swipe', (await val(() => document.querySelector('.view.active').id)) === 'itinerary');
+
+  await val(() => scrollTo(0, 0)); await page.waitForTimeout(300);
+  await page.mouse.wheel(0, 700); await page.waitForTimeout(500);
+  const down = await val(() => document.querySelector('.topbar').classList.contains('hidden'));
+  await page.mouse.wheel(0, -300); await page.waitForTimeout(500);
+  const up = await val(() => document.querySelector('.topbar').classList.contains('hidden'));
+  check('the header hides going down and returns going up', down === true && up === false, `down=${down} up=${up}`);
+
+  /* the itinerary is the long one; scroll it, go away, come back */
+  await page.click('.tab[data-view="itinerary"]'); await page.waitForTimeout(400);
+  await val(() => scrollTo(0, 500)); await page.waitForTimeout(400);
+  const left = await val(() => Math.round(scrollY));
+  await page.click('.tab[data-view="costs"]'); await page.waitForTimeout(300);
+  const away = await val(() => Math.round(scrollY));
+  await page.click('.tab[data-view="itinerary"]'); await page.waitForTimeout(500);
+  const back = await val(() => Math.round(scrollY));
+  check('each tab keeps its own scroll position', left > 400 && away < 60 && Math.abs(back - left) < 40,
+    `left at ${left}, costs opened at ${away}, came back to ${back}`);
+
+  check('no errors across every interaction', !errs.length, errs.slice(0, 2).join(' | '));
   await ctx.close();
 }
 

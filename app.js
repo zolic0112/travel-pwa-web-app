@@ -499,8 +499,18 @@ function setupNextJump(){
   $('#jumpNextBtn').onclick=()=>{
     showView('itinerary');
     const day=$('#jumpNextBtn').dataset.day;
-    if(day!==undefined) setDay(day);
-    $('#itinerary').scrollIntoView({behavior:'smooth',block:'start'});
+    if(day) setDay(day);
+    /* Scrolling to #itinerary did nothing: the panel starts at the top of the
+       page and the card with the button is the first thing in it, so the app
+       usually opens already scrolled exactly where the button scrolled to.
+       The row the countdown is about is what the user wants to see. */
+    requestAnimationFrame(()=>{
+      const row=$('.tl-row.is-next')||$('#timeline');
+      if(!row) return;
+      const top=row.getBoundingClientRect().top+scrollY
+        -(($('.topbar')?.offsetHeight||0)+12);
+      scrollTo({top:Math.max(0,top),behavior:'smooth'});
+    });
   };
 }
 function setupSources(){
