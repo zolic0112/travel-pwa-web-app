@@ -109,15 +109,15 @@ const tripDates=['2026-10-08','2026-10-09','2026-10-10','2026-10-11','2026-10-12
 const tripDateLabels=['10/08（四）','10/09（五）','10/10（六）','10/11（日）','10/12（一）','10/13（二）'];
 
 const milestones=[
-  {at:'2026-10-08T06:40:00+08:00',title:'左營出發 → 桃園',kind:'高鐵',detail:'預定 08:18 抵達桃園高鐵站',day:0},
-  {at:'2026-10-08T11:15:00+08:00',title:'JX725 台北 → 吉隆坡',kind:'航班',detail:'TPE T2 · 11:15 起飛',day:0},
-  {at:'2026-10-10T14:30:00+08:00',title:'最晚離開吉隆坡市區往 KUL',kind:'移動',detail:'目標 15:30–16:00 到 T1',day:2},
-  {at:'2026-10-10T18:25:00+08:00',title:'MH2528 吉隆坡 → 古晉',kind:'航班',detail:'KUL T1 · 18:25 起飛',day:2},
-  {at:'2026-10-13T07:15:00+08:00',title:'Hilton Kuching 出發 → KCH',kind:'移動',detail:'建議 07:15–07:30 離開',day:5},
-  {at:'2026-10-13T09:55:00+08:00',title:'MH2543 古晉 → 吉隆坡',kind:'航班',detail:'KCH · 09:55 起飛',day:5},
-  {at:'2026-10-13T14:30:00+08:00',title:'BR228 報到截止',kind:'關鍵截止',detail:'KUL T1 · 務必在此之前完成重新報到',day:5,hint:'全程最關鍵的時間點'},
-  {at:'2026-10-13T15:30:00+08:00',title:'BR228 吉隆坡 → 台北',kind:'航班',detail:'KUL T1 · 15:30 起飛',day:5},
-  {at:'2026-10-13T22:05:00+08:00',title:'桃園 → 左營高鐵候選',kind:'高鐵',detail:'暫定；以正式班表及實際入境時間決定',day:5,hint:'依實際入境時間再決定班次'}
+  {at:'2026-10-08T06:40:00+08:00',ref:'06:40',title:'左營出發 → 桃園',kind:'高鐵',detail:'預定 08:18 抵達桃園高鐵站',day:0},
+  {at:'2026-10-08T11:15:00+08:00',ref:'11:15–16:10',title:'JX725 台北 → 吉隆坡',kind:'航班',detail:'TPE T2 · 11:15 起飛',day:0},
+  {at:'2026-10-10T14:30:00+08:00',ref:'建議14:30前',title:'最晚離開吉隆坡市區往 KUL',kind:'移動',detail:'目標 15:30–16:00 到 T1',day:2},
+  {at:'2026-10-10T18:25:00+08:00',ref:'18:25–20:15',title:'MH2528 吉隆坡 → 古晉',kind:'航班',detail:'KUL T1 · 18:25 起飛',day:2},
+  {at:'2026-10-13T07:15:00+08:00',ref:'07:15–07:30',title:'Hilton Kuching 出發 → KCH',kind:'移動',detail:'建議 07:15–07:30 離開',day:5},
+  {at:'2026-10-13T09:55:00+08:00',ref:'09:55–11:45',title:'MH2543 古晉 → 吉隆坡',kind:'航班',detail:'KCH · 09:55 起飛',day:5},
+  {at:'2026-10-13T14:30:00+08:00',ref:'11:45–14:30',title:'BR228 報到截止',kind:'關鍵截止',detail:'KUL T1 · 務必在此之前完成重新報到',day:5,hint:'全程最關鍵的時間點'},
+  {at:'2026-10-13T15:30:00+08:00',ref:'15:30–20:25',title:'BR228 吉隆坡 → 台北',kind:'航班',detail:'KUL T1 · 15:30 起飛',day:5},
+  {at:'2026-10-13T22:05:00+08:00',ref:'22:05 之後',title:'桃園 → 左營高鐵候選',kind:'高鐵',detail:'暫定；以正式班表及實際入境時間決定',day:5,hint:'依實際入境時間再決定班次'}
 ];
 
 /* both day strips are the same question, so they share one answer */
@@ -202,7 +202,12 @@ function setDay(v){
 
 /* ── todos ────────────────────────────────────────────────── */
 const todoKey='myTrip2026.todos';
-function getTodoState(){try{return JSON.parse(localStorage.getItem(todoKey))||{}}catch{return {}}}
+function getTodoState(){
+  try{
+    const v=JSON.parse(localStorage.getItem(todoKey));
+    return v&&typeof v==='object'&&!Array.isArray(v)?v:{};
+  }catch{return {}}
+}
 function renderTodos(){
   const state=getTodoState();
   const nextIx=trip.todos.findIndex((_,i)=>!state[i]);
@@ -214,7 +219,9 @@ function renderTodos(){
       <p>${t.why}${t.note?` · ${t.note}`:''}</p>
     </div></label>`).join('');
   $$('#todoList input').forEach(cb=>cb.addEventListener('change',()=>{
-    const s=getTodoState();s[cb.dataset.i]=cb.checked;localStorage.setItem(todoKey,JSON.stringify(s));renderTodos();
+    const s=getTodoState();s[cb.dataset.i]=cb.checked;
+    try{localStorage.setItem(todoKey,JSON.stringify(s));}catch{toast('無法儲存勾選狀態');}
+    renderTodos();
   }));
   const done=trip.todos.filter((_,i)=>state[i]).length, total=trip.todos.length, pct=Math.round(done/total*100);
   $('#todoProgressText').textContent=`${done} / ${total} 完成`;
@@ -248,8 +255,19 @@ function renderCosts(){
 
 /* ── planner ──────────────────────────────────────────────── */
 const planKey='myTrip2026.plans.v1';
-function getPlans(){try{return JSON.parse(localStorage.getItem(planKey))||[]}catch{return []}}
-function savePlans(plans){localStorage.setItem(planKey,JSON.stringify(plans));renderPlans();dayChips(selectedDay,setDay,'#dayStrip');dayChips(selectedDay,setDay,'#planDayStrip');updateNextEvent();}
+function getPlans(){
+  try{
+    const v=JSON.parse(localStorage.getItem(planKey));
+    if(!Array.isArray(v)) return [];
+    const str=(o,k)=>typeof o[k]==='string';
+    return v.filter(x=>x&&typeof x==='object'&&str(x,'id')&&str(x,'date')&&str(x,'time')&&str(x,'title'))
+      .filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&/^\d{2}:\d{2}$/.test(x.time));
+  }catch{return []}
+}
+function savePlans(plans){
+  try{localStorage.setItem(planKey,JSON.stringify(plans));}
+  catch{toast('無法儲存，裝置儲存空間已滿');return;}
+  renderPlans();dayChips(selectedDay,setDay,'#dayStrip');dayChips(selectedDay,setDay,'#planDayStrip');updateNextEvent();}
 
 function setupPlanner(){
   $('#planDate').innerHTML=tripDates.map((d,i)=>`<option value="${d}">${tripDateLabels[i]}</option>`).join('');
@@ -282,12 +300,12 @@ function renderPlans(){
   const plans=getPlans().filter(x=>!iso||x.date===iso).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
   $('#planEmpty').hidden=plans.length>0;
   $('#planList').innerHTML=plans.map(p=>`<article class="plan-card">
-    <div class="plan-time"><b>${p.time}</b><small>${p.date.slice(5).replace('-','/')}</small></div>
+    <div class="plan-time"><b>${escapeHtml(p.time)}</b><small>${escapeHtml(p.date.slice(5).replace('-','/'))}</small></div>
     <span class="plan-ico">${typeIcon(p.type)}</span>
     <div class="plan-body">
       <h3>${escapeHtml(p.title)}</h3>
       ${p.note?`<p>${escapeHtml(p.note)}</p>`:''}
-      <div class="plan-badges"><span class="badge">${p.type}</span>${p.duration?`<span class="badge">${escapeHtml(p.duration)}</span>`:''}</div>
+      <div class="plan-badges"><span class="badge">${escapeHtml(p.type)}</span>${p.duration?`<span class="badge">${escapeHtml(p.duration)}</span>`:''}</div>
     </div>
     <div class="plan-acts">
       <button class="icon-btn" type="button" data-copy="${escapeHtml(p.note?`${p.title} ${p.note}`:p.title)}" aria-label="複製這筆行程的文字">${ICO.copy}</button>
@@ -347,9 +365,9 @@ function updateNextEvent(){
   $('#nextHint').textContent=next.hint||'';
   $('#nextIcon').innerHTML=typeIcon(next.kind);
   $('#jumpNextBtn').dataset.day=String(next.day);
-  const day=trip.days[next.day];
-  const match=day&&day.events.find(e=>next.title.includes(e.title)||e.title.includes(next.title)
-    ||(next.detail||'').includes(e.time)||e.time.startsWith(next.at.slice(11,16)));
+  /* milestones name their row outright; guessing from titles left the
+     10/10 departure and the 10/13 check-in deadline pointing at nothing */
+  const match=next.ref&&trip.days[next.day]?.events.find(e=>e.time===next.ref);
   const key=match?`${next.day}|${match.time}|${match.title}`:'';
   if(key!==nextEventKey){nextEventKey=key;renderTimeline();}
   const prev=i>0?new Date(all[i-1].at).getTime():t-24*3600*1000;
