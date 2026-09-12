@@ -44,56 +44,6 @@
   <main id="main">
     <p id="nextStatus" class="sr-only" role="status" aria-atomic="true"></p>
 
-    <section id="nowPanel" class="now-panel" aria-label="下一個行程">
-      <div class="now-head">
-        <span class="now-kicker">下一個行程</span>
-        <span id="clockText" class="clock num"></span>
-      </div>
-      <div class="now-main">
-        <span class="now-icon" id="nextIcon" aria-hidden="true"></span>
-        <div class="now-text">
-          <h2 id="nextTitle">載入中…</h2>
-          <p id="nextMeta">—</p>
-        </div>
-        <div class="now-count">
-          <div class="countdown num" id="nextCountdown">—</div>
-          <div class="count-label num" id="nextAt">—</div>
-        </div>
-      </div>
-      <div class="now-bar" aria-hidden="true"><i id="nowBar"></i></div>
-      <div class="now-actions">
-        <button class="btn on-dark" id="jumpNextBtn">查看行程</button>
-        <span class="now-hint" id="nextHint"></span>
-      </div>
-    </section>
-
-    <section class="vitals" aria-label="旅程摘要">
-      <article class="vital">
-        <span class="vital-icon" data-icon="wallet" aria-hidden="true"></span>
-        <div class="vital-body">
-          <span class="vital-label">固定費用</span>
-          <strong class="num">NT$156,037</strong>
-          <small>約 NT$31,207 / 人</small>
-        </div>
-      </article>
-      <article class="vital flag">
-        <span class="vital-icon" data-icon="alert" aria-hidden="true"></span>
-        <div class="vital-body">
-          <span class="vital-label">關鍵截止</span>
-          <strong class="num">10/13 14:30</strong>
-          <small>BR228 關櫃</small>
-        </div>
-      </article>
-      <article class="vital">
-        <span class="vital-icon" data-icon="luggage" aria-hidden="true"></span>
-        <div class="vital-body">
-          <span class="vital-label">托運控制</span>
-          <strong class="num">≤ 20 kg</strong>
-          <small>以馬航額度為準</small>
-        </div>
-      </article>
-    </section>
-
     <div class="tabs" role="tablist" aria-label="主要頁籤">
       <button class="tab active" role="tab" id="tab-itinerary" aria-controls="itinerary" aria-selected="true" tabindex="0" data-view="itinerary" data-icon="route"><span class="tab-ico" aria-hidden="true"></span><span class="tab-label">行程</span></button>
       <button class="tab" role="tab" id="tab-planner" aria-controls="planner" aria-selected="false" tabindex="-1" data-view="planner" data-icon="pin"><span class="tab-ico" aria-hidden="true"></span><span class="tab-label">每日規劃</span></button>
@@ -102,6 +52,29 @@
     </div>
 
     <section id="itinerary" class="view active" role="tabpanel" aria-labelledby="tab-itinerary" tabindex="0">
+      <section id="nowPanel" class="now-panel" aria-label="下一個行程">
+        <div class="now-head">
+          <span class="now-kicker">下一個行程</span>
+          <span id="clockText" class="clock num"></span>
+        </div>
+        <div class="now-main">
+          <span class="now-icon" id="nextIcon" aria-hidden="true"></span>
+          <div class="now-text">
+            <h2 id="nextTitle">載入中…</h2>
+            <p id="nextMeta">—</p>
+          </div>
+          <div class="now-count">
+            <div class="countdown num" id="nextCountdown">—</div>
+            <div class="count-label num" id="nextAt">—</div>
+          </div>
+        </div>
+        <div class="now-bar" aria-hidden="true"><i id="nowBar"></i></div>
+        <div class="now-actions">
+          <button class="btn on-dark" id="jumpNextBtn">查看行程</button>
+          <span class="now-hint" id="nextHint"></span>
+        </div>
+      </section>
+
       <div class="section-head">
         <div><h2>固定時間軸</h2><p>航班、住宿與關鍵轉乘；倒數以 UTC+8 計算。</p></div>
       </div>

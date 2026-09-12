@@ -118,8 +118,8 @@ const milestones=[
   {at:'2026-10-13T22:05:00+08:00',title:'桃園 → 左營高鐵候選',kind:'高鐵',detail:'暫定；以正式班表及實際入境時間決定',day:5,hint:'依實際入境時間再決定班次'}
 ];
 
-let dayFilter='all';
-let planFilter='all';
+/* both day strips are the same question, so they share one answer */
+let selectedDay='all';
 
 /* ── day strip ────────────────────────────────────────────── */
 function dayChips(current, onPick, stripId){
@@ -182,7 +182,7 @@ function eventRow(e,dayIx){
   </article>`;
 }
 function renderTimeline(){
-  const idx=dayFilter==='all'?trip.days.map((_,i)=>i):[Number(dayFilter)];
+  const idx=selectedDay==='all'?trip.days.map((_,i)=>i):[Number(selectedDay)];
   $('#timeline').innerHTML=idx.map(i=>{
     const d=trip.days[i];
     return `<section class="day-group">
@@ -191,7 +191,12 @@ function renderTimeline(){
     </section>`;
   }).join('');
 }
-function setDay(v){dayFilter=v;dayChips(dayFilter,setDay,'#dayStrip');renderTimeline();}
+function setDay(v){
+  selectedDay=v;
+  dayChips(selectedDay,setDay,'#dayStrip');
+  dayChips(selectedDay,setDay,'#planDayStrip');
+  renderTimeline();renderPlans();
+}
 
 /* ── todos ────────────────────────────────────────────────── */
 const todoKey='myTrip2026.todos';
@@ -242,11 +247,11 @@ function renderCosts(){
 /* ── planner ──────────────────────────────────────────────── */
 const planKey='myTrip2026.plans.v1';
 function getPlans(){try{return JSON.parse(localStorage.getItem(planKey))||[]}catch{return []}}
-function savePlans(plans){localStorage.setItem(planKey,JSON.stringify(plans));renderPlans();dayChips(dayFilter,setDay,'#dayStrip');updateNextEvent();}
-function setPlanDay(v){planFilter=v;dayChips(planFilter,setPlanDay,'#planDayStrip');renderPlans();}
+function savePlans(plans){localStorage.setItem(planKey,JSON.stringify(plans));renderPlans();dayChips(selectedDay,setDay,'#dayStrip');dayChips(selectedDay,setDay,'#planDayStrip');updateNextEvent();}
+
 function setupPlanner(){
   $('#planDate').innerHTML=tripDates.map((d,i)=>`<option value="${d}">${tripDateLabels[i]}</option>`).join('');
-  dayChips(planFilter,setPlanDay,'#planDayStrip');
+  dayChips(selectedDay,setDay,'#planDayStrip');
   $('#addPlanBtn').addEventListener('click',()=>openPlanDialog());
   $('#closePlan').onclick=$('#cancelPlan').onclick=()=>$('#planDialog').close();
   $('#planForm').addEventListener('submit',e=>{
@@ -262,7 +267,7 @@ function setupPlanner(){
 function openPlanDialog(item=null){
   $('#planDialogTitle').textContent=item?'編輯行程':'新增行程';
   $('#planForm').dataset.editId=item?.id||'';
-  $('#planDate').value=item?.date || (planFilter!=='all'?tripDates[Number(planFilter)]:tripDates[0]);
+  $('#planDate').value=item?.date || (selectedDay!=='all'?tripDates[Number(selectedDay)]:tripDates[0]);
   $('#planTime').value=item?.time||'12:00';
   $('#planTitle').value=item?.title||'';
   $('#planType').value=item?.type||'景點';
@@ -271,7 +276,7 @@ function openPlanDialog(item=null){
   $('#planDialog').showModal(); setTimeout(()=>$('#planTitle').focus(),80);
 }
 function renderPlans(){
-  const iso=planFilter==='all'?null:tripDates[Number(planFilter)];
+  const iso=selectedDay==='all'?null:tripDates[Number(selectedDay)];
   const plans=getPlans().filter(x=>!iso||x.date===iso).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
   $('#planEmpty').hidden=plans.length>0;
   $('#planList').innerHTML=plans.map(p=>`<article class="plan-card">
@@ -455,8 +460,11 @@ function openingDay(){
 
 /* ── chrome ───────────────────────────────────────────────── */
 const VIEW_ORDER=['itinerary','planner','todos','costs'];
+const scrollMemory={};
 function showView(name,focusTab){
-  const from=VIEW_ORDER.indexOf($('.view.active')?.id), to=VIEW_ORDER.indexOf(name);
+  const current=$('.view.active')?.id;
+  if(current) scrollMemory[current]=scrollY;
+  const from=VIEW_ORDER.indexOf(current), to=VIEW_ORDER.indexOf(name);
   if(from>=0&&to>=0&&from!==to) document.documentElement.style.setProperty('--view-dir',(to>from?14:-14)+'px');
   $('#addPlanFab').classList.toggle('show',name==='planner');
   $$('.tab').forEach(x=>{
@@ -467,12 +475,15 @@ function showView(name,focusTab){
     if(on&&focusTab) x.focus();
   });
   $$('.view').forEach(x=>x.classList.toggle('active',x.id===name));
+  /* the alert is about one moment on 10/13; it does not belong over the costs table */
+  $('#criticalBanner').classList.toggle('off-view',name!=='itinerary');
+  requestAnimationFrame(()=>scrollTo({top:scrollMemory[name]||0,behavior:'instant'}));
 }
 function setupTabs(){
   const tabs=$$('.tab');
   tabs.forEach((b,i)=>{
     b.querySelector('.tab-ico').innerHTML=icon(b.dataset.icon);
-    b.addEventListener('click',()=>{showView(b.dataset.view);window.scrollTo({top:0,behavior:'smooth'});});
+    b.addEventListener('click',()=>showView(b.dataset.view));
     b.addEventListener('keydown',e=>{
       const step={ArrowRight:1,ArrowLeft:-1,Home:-i,End:tabs.length-1-i}[e.key];
       if(step===undefined) return;
@@ -525,9 +536,8 @@ setupTabs();
 setupHeaderCollapse();
 setupSwipe();
 $('#addPlanFab').onclick=()=>openPlanDialog();
-dayFilter=openingDay();
-planFilter=dayFilter;
-dayChips(dayFilter,setDay,'#dayStrip');
+selectedDay=openingDay();
+dayChips(selectedDay,setDay,'#dayStrip');
 renderTimeline();
 renderTodos();
 renderCosts();
