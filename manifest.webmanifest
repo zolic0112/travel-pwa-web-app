@@ -1,7 +1,7 @@
 {
   "name": "馬來西亞 6天5夜｜旅程助手",
   "short_name": "馬來西亞行程",
-  "description": "2026/10/08–10/13 吉隆坡＋古晉行程、風險檢查、待辦與費用",
+  "description": "2026 馬來西亞 6天5夜旅程助手：下一個行程、倒數、每日行程與出發前待辦",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
