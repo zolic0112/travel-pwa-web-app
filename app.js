@@ -567,10 +567,10 @@ function setupPWA(){
     });
     navigator.serviceWorker.register('./sw.js');
   }
-  let promptEvent=null; const btn=$('#installBtn');
-  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();promptEvent=e;btn.hidden=false;});
-  btn.addEventListener('click',async()=>{if(!promptEvent)return;promptEvent.prompt();await promptEvent.userChoice;promptEvent=null;btn.hidden=true;});
-  window.addEventListener('appinstalled',()=>btn.hidden=true);
+  /* No install button. beforeinstallprompt is Chromium-only — it never fires on
+     iOS, where this app is actually used, so the button was either absent or
+     present-and-inert depending on the browser. Adding to the home screen is
+     the browser's own share-sheet action; the manifest is what makes it work. */
 }
 $('#resetTodos').addEventListener('click',()=>{
   const before=getTodoState();
