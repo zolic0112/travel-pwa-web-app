@@ -1,7 +1,7 @@
-const VERSION = 'v4';
+const VERSION = 'v5';
 const SHELL = `shell-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
-const SHELL_URLS = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest'];
+const SHELL_URLS = ['./', './index.html', './trip.js', './styles.css', './app.js', './manifest.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(SHELL).then(c => c.addAll(SHELL_URLS)).then(() => self.skipWaiting()));

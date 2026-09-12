@@ -21,6 +21,10 @@ const { chromium } = await (async () => {
   process.exit(2);
 })();
 
+import fs from 'node:fs';
+import path from 'node:path';
+
+const HERE = import.meta.dirname;
 const URL = process.env.SMOKE_URL || 'http://localhost:8099/';
 const EXEC = process.env.CHROMIUM_PATH;
 const fails = [];
@@ -34,6 +38,8 @@ const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile:
 
 const open = async (opts = {}) => {
   const ctx = await browser.newContext({ ...phone, ...opts.context });
+  if (opts.trip) await ctx.route('**/trip.js', r =>
+    r.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(opts.trip, 'utf8') }));
   if (opts.clock) await ctx.addInitScript(`{const F=Date;const f=new F(${JSON.stringify(opts.clock)}).getTime();
     class D extends F{constructor(...a){a.length?super(...a):super(f)}static now(){return f}}globalThis.Date=D;}`);
   const page = await ctx.newPage();
@@ -170,6 +176,33 @@ console.log('\n── the shell holds together ──');
   check('no horizontal overflow', (await page.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0);
   check('no errors', !errs.length, errs[0] || '');
+  await ctx.close();
+}
+
+console.log('\n── the app carries no knowledge of one particular trip ──');
+{
+  /* a different country, currency, party size, time zone and vocabulary,
+     served in place of trip.js with no change to app.js */
+  const { page, ctx, errs } = await open({ trip: path.join(HERE, 'fixtures/sample.trip.js'),
+    clock: '2027-03-05T06:00:00+09:00' });
+  const seen = await page.evaluate(() => ({
+    title: document.title,
+    h1: document.querySelector('#tripTitle').textContent,
+    route: document.querySelector('#tripRoute').textContent,
+    next: document.querySelector('#nextTitle').textContent,
+    marked: document.querySelector('.tl-row.is-next .tl-card h3')?.textContent?.trim(),
+    days: document.querySelectorAll('#dayStrip .day-chip').length,
+    rows: document.querySelectorAll('.tl-row').length,
+    money: document.querySelector('#costSummary strong')?.textContent,
+    alert: document.querySelector('#alertText').textContent,
+  }));
+  check('the other trip renders end to end', !errs.length, errs[0] || '');
+  check('its own name is in the shell', seen.title === '東京 3天2夜' && seen.h1 === seen.title, seen.h1);
+  check('its route strip is built from its own flights', seen.route === 'TPENRTTPE', seen.route);
+  check('its day strip is its own length', seen.days === 4, `${seen.days} chips for 3 days + 全部日期`);
+  check('its countdown points at one of its rows', !!seen.marked && seen.next.length > 0, `${seen.next} → ${seen.marked}`);
+  check('its money is in its own currency', seen.money?.startsWith('¥'), seen.money);
+  check('its alert is its own', seen.alert.includes('成田'), seen.alert);
   await ctx.close();
 }
 

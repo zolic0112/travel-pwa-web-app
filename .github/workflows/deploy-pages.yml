@@ -25,6 +25,11 @@ jobs:
       # A dropped custom-property declaration is silent in CSS and has shipped
       # a square-cornered, serif-font build once already.
       - run: node scripts/check-tokens.mjs
+      # The trip file is the only place a journey is described. A bad date or a
+      # milestone naming a row that moved would otherwise surface as an empty
+      # countdown on the road.
+      - run: node scripts/check-trip.mjs
+      - run: node scripts/check-trip.mjs scripts/fixtures/sample.trip.js
       - uses: actions/configure-pages@v5
         with:
           enablement: true

@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="theme-color" content="#EBF0EF" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#08171C" media="(prefers-color-scheme: dark)" />
-  <meta name="description" content="2026 馬來西亞 6天5夜旅程助手：下一個行程、倒數、每日行程與出發前待辦" />
+  <meta name="description" content="" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -15,23 +15,29 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" />
   <link rel="stylesheet" href="styles.css" />
-  <title>馬來西亞 6天5夜</title>
+  <title></title>
+  <script src="trip.js"></script>
   <script>
-    /* Stamp the saved theme before first paint, otherwise an explicit choice
-       flashes the system theme for a frame on every load. */
-    try{var t=localStorage.getItem('myTrip2026.theme');
-      if(t==='dark'||t==='light') document.documentElement.setAttribute('data-theme',t);}catch(e){}
+    /* The title, the description and the saved theme all come from the trip
+       and are stamped before first paint: a title filled in later shows the
+       URL in the tab for a beat, and an explicit theme filled in later
+       flashes the system one for a frame. */
+    (function(){
+      var m = window.TRIP.meta;
+      document.title = m.title;
+      document.querySelector('meta[name="description"]').content = m.description;
+      try{var t=localStorage.getItem(m.id+'.theme');
+        if(t==='dark'||t==='light') document.documentElement.setAttribute('data-theme',t);}catch(e){}
+    })();
   </script>
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要內容</a>
   <header class="topbar">
     <div class="brand-block">
-      <p class="eyebrow">2026 · 10/08–10/13 · 5 人</p>
-      <h1>馬來西亞 6天5夜</h1>
-      <div class="route-strip" aria-label="全程航段 台北 吉隆坡 古晉 吉隆坡 台北">
-        <span class="num">TPE</span><i></i><span class="num">KUL</span><i></i><span class="num">KCH</span><i></i><span class="num">KUL</span><i></i><span class="num">TPE</span>
-      </div>
+      <p class="eyebrow" id="tripSubtitle"></p>
+      <h1 id="tripTitle"></h1>
+      <div class="route-strip" id="tripRoute"></div>
     </div>
     <div class="topbar-actions">
       <div class="theme-switch" role="radiogroup" aria-label="外觀主題">
@@ -78,7 +84,7 @@
       </section>
 
       <div class="section-head">
-        <div><h2>固定時間軸</h2><p>航班、住宿與關鍵轉乘；倒數以 UTC+8 計算。</p></div>
+        <div><h2>固定時間軸</h2><p id="timelineNote"></p></div>
       </div>
       <div class="day-strip" id="dayStrip" role="group" aria-label="篩選日期"></div>
       <div id="timeline" class="timeline"></div>
@@ -128,17 +134,17 @@
   <button id="addPlanFab" class="fab" data-icon="plus" aria-label="新增行程"></button>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <aside id="criticalBanner" class="critical-banner" aria-label="10/13 關鍵提醒">
+  <aside id="criticalBanner" class="critical-banner">
     <span class="cb-icon" data-icon="alert" aria-hidden="true"></span>
     <div class="cb-text">
-      <strong>10/13 關鍵提醒</strong>
-      <span>MH2543 抵達 KUL 後，直接領行李 → 長榮重新報到。14:30 前完成。</span>
+      <strong id="alertTitle"></strong>
+      <span id="alertText"></span>
     </div>
     <button id="dismissBanner" class="cb-close" aria-label="關閉提醒">×</button>
   </aside>
 
   <footer>
-    <span>資料檢查日：2026/09/11</span>
+    <span id="checkedOn"></span>
     <button id="sourceBtn" class="link-btn">查看資料來源</button>
   </footer>
 
@@ -149,7 +155,7 @@
         <label>日期<select id="planDate" required></select></label>
         <label>時間<input id="planTime" type="time" required /></label>
         <label class="full">名稱<input id="planTitle" type="text" maxlength="60" placeholder="例如：亞羅街晚餐" required /></label>
-        <label>類型<select id="planType"><option>景點</option><option>餐廳</option><option>交通</option><option>集合</option><option>購物</option><option>其他</option></select></label>
+        <label>類型<select id="planType"></select></label>
         <label>預估時間<input id="planDuration" type="text" maxlength="30" placeholder="例如 90 分鐘" /></label>
         <label class="full">地點 / 備註<textarea id="planNote" rows="3" maxlength="220" placeholder="地址、訂位資訊、集合點或提醒"></textarea></label>
       </div>
