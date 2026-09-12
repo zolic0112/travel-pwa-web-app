@@ -5,6 +5,8 @@
   --surface:#FFFFFF;
   --surface-2:#EDF4F2;
   --sunken:#D2DFDC;
+  --bar:#D2DFDC;
+  --bar-active:#FFFFFF;
   --text:#0E2B29;
   --text-2:#37524F;
   --muted:#4C6460;
@@ -46,72 +48,82 @@
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --paper:#051318;
-    --surface:#112932;
-    --surface-2:#1A3A44;
-    --sunken:#020B0F;
-    --text:#E2EFED;
-    --text-2:#B4CECA;
-    --muted:#8AAAA6;
-    --line:#26505C;
-    --line-soft:#1C3E48;
-    --brand:#45BCA8;
-    --brand-deep:#86DECD;
-    --brand-soft:#12403C;
-    --on-brand:#04211D;
-    --accent:#EFA84E;
-    --accent-text:#EFA84E;
-    --accent-soft:#382B18;
-    --danger:#F28A80;
-    --danger-soft:#3E201C;
-    --caution:#E3AB55;
-    --caution-soft:#382B18;
-    --good:#55C894;
-    --good-soft:#12392E;
-    --ink:#020D11;
-    --ink-2:#0B2229;
-    --on-ink:#E4F1EF;
-    --on-ink-dim:#8FB0AC;
-    --countdown:#F0B45C;
-    --node:#1A3A44;
-    --shadow-sm:0 1px 2px rgba(0,0,0,.34);
-    --shadow-md:0 2px 4px rgba(0,0,0,.30), 0 12px 28px rgba(0,0,0,.40);
-    --shadow-lg:0 22px 56px rgba(0,0,0,.58);
+    --paper:#081A1F;
+    --surface:#102F38;
+    --surface-2:#19424D;
+    --sunken:#031014;
+    --bar:#0D242B;
+    --bar-active:#1E4A56;
+    --text:#E6F2F0;
+    --text-2:#B9D2CE;
+    --muted:#9BBCB7;
+    --line:#2C5B69;
+    --line-soft:#1E4552;
+    --brand:#3FC9AE;
+    --brand-deep:#7FE8D2;
+    --brand-soft:#0F4A44;
+    --on-brand:#032420;
+    --accent:#F2AE58;
+    --accent-text:#F2AE58;
+    --accent-soft:#42301A;
+    --danger:#F79086;
+    --danger-soft:#4A231E;
+    --caution:#E9B45F;
+    --caution-soft:#42301A;
+    --good:#5AD09B;
+    --good-soft:#124334;
+    /* In dark mode elevation goes UP in lightness. The hero used to be the
+       darkest thing on the page, which put it BELOW the background and made it
+       vanish; it is now the most saturated, lightest block instead. */
+    --ink:#0B3F3C;
+    --ink-2:#155A50;
+    --on-ink:#EAF7F4;
+    --on-ink-dim:#A8CCC5;
+    --countdown:#FFC470;
+    --node:#19424D;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.40);
+    --shadow-md:0 2px 4px rgba(0,0,0,.34), 0 12px 28px rgba(0,0,0,.46);
+    --shadow-lg:0 22px 56px rgba(0,0,0,.62);
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
-  --paper:#051318;
-  --surface:#112932;
-  --surface-2:#1A3A44;
-  --sunken:#020B0F;
-  --text:#E2EFED;
-  --text-2:#B4CECA;
-  --muted:#8AAAA6;
-  --line:#26505C;
-  --line-soft:#1C3E48;
-  --brand:#45BCA8;
-  --brand-deep:#86DECD;
-  --brand-soft:#12403C;
-  --on-brand:#04211D;
-  --accent:#EFA84E;
-  --accent-text:#EFA84E;
-  --accent-soft:#382B18;
-  --danger:#F28A80;
-  --danger-soft:#3E201C;
-  --caution:#E3AB55;
-  --caution-soft:#382B18;
-  --good:#55C894;
-  --good-soft:#12392E;
-  --ink:#020D11;
-  --ink-2:#0B2229;
-  --on-ink:#E4F1EF;
-  --on-ink-dim:#8FB0AC;
-  --countdown:#F0B45C;
-  --node:#1A3A44;
-  --shadow-sm:0 1px 2px rgba(0,0,0,.34);
-  --shadow-md:0 2px 4px rgba(0,0,0,.30), 0 12px 28px rgba(0,0,0,.40);
-  --shadow-lg:0 22px 56px rgba(0,0,0,.58);
+    --paper:#081A1F;
+  --surface:#102F38;
+  --surface-2:#19424D;
+  --sunken:#031014;
+  --bar:#0D242B;
+  --bar-active:#1E4A56;
+  --text:#E6F2F0;
+  --text-2:#B9D2CE;
+  --muted:#9BBCB7;
+  --line:#2C5B69;
+  --line-soft:#1E4552;
+  --brand:#3FC9AE;
+  --brand-deep:#7FE8D2;
+  --brand-soft:#0F4A44;
+  --on-brand:#032420;
+  --accent:#F2AE58;
+  --accent-text:#F2AE58;
+  --accent-soft:#42301A;
+  --danger:#F79086;
+  --danger-soft:#4A231E;
+  --caution:#E9B45F;
+  --caution-soft:#42301A;
+  --good:#5AD09B;
+  --good-soft:#124334;
+  /* In dark mode elevation goes UP in lightness. The hero used to be the
+     darkest thing on the page, which put it BELOW the background and made it
+     vanish; it is now the most saturated, lightest block instead. */
+  --ink:#0B3F3C;
+  --ink-2:#155A50;
+  --on-ink:#EAF7F4;
+  --on-ink-dim:#A8CCC5;
+  --countdown:#FFC470;
+  --node:#19424D;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.40);
+  --shadow-md:0 2px 4px rgba(0,0,0,.34), 0 12px 28px rgba(0,0,0,.46);
+  --shadow-lg:0 22px 56px rgba(0,0,0,.62);
   color-scheme:dark;
 }
 
@@ -203,7 +215,7 @@ svg{display:block}
 .route-strip i{width:14px;height:1px;background:var(--line);flex:none}
 .topbar-actions{display:flex;align-items:center;gap:9px;flex:none}
 .theme-switch{
-  display:flex;gap:2px;padding:3px;background:var(--sunken);
+  display:flex;gap:2px;padding:3px;background:var(--bar);
   border-radius:var(--r-md);border:1px solid var(--line-soft);
 }
 .theme-opt{
@@ -213,7 +225,7 @@ svg{display:block}
 }
 .theme-opt svg{width:17px;height:17px}
 .theme-opt:active{background:var(--surface-2)}
-.theme-opt[aria-checked="true"]{background:var(--surface);color:var(--brand);box-shadow:var(--shadow-sm)}
+.theme-opt[aria-checked="true"]{background:var(--bar-active);color:var(--brand);box-shadow:var(--shadow-sm)}
 
 main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1;touch-action:pan-y}
 
@@ -257,7 +269,7 @@ main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1;to
 /* ── tabs ─────────────────────────────────────────────────── */
 .tabs{
   display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
-  background:var(--sunken);padding:4px;border-radius:var(--r-md);
+  background:var(--bar);padding:4px;border-radius:var(--r-md);
   margin:18px 0 4px;position:sticky;top:88px;z-index:var(--z-tabs);
   box-shadow:0 0 0 1px var(--line-soft);
 }
@@ -269,7 +281,7 @@ main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1;to
 }
 .tab-ico{display:grid;place-items:center}
 .tab-ico svg{width:15px;height:15px}
-.tab.active{background:var(--surface);color:var(--brand-deep);box-shadow:var(--shadow-sm)}
+.tab.active{background:var(--bar-active);color:var(--brand-deep);box-shadow:var(--shadow-sm)}
 .view{display:none}
 .view.active{display:block;animation:viewIn .24s var(--ease-out) both}
 @keyframes viewIn{from{opacity:0;transform:translateX(var(--view-dir,10px))}to{opacity:1;transform:none}}
@@ -438,7 +450,8 @@ main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1;to
 }
 .ring{width:60px;height:60px;flex:none;transform:rotate(-90deg)}
 .ring circle{fill:none;stroke-width:7;stroke-linecap:round}
-.ring-bg{stroke:var(--sunken)}
+/* a recessed track, not a hole: pure sunken reads as a black donut in dark */
+.ring-bg{stroke:var(--line-soft)}
 .ring-fg{stroke:var(--brand);stroke-dasharray:194.8;stroke-dashoffset:194.8;transition:stroke-dashoffset .45s ease}
 .progress-meta{flex:1;min-width:0}
 .progress-meta strong{display:block;font-size:22px;font-weight:600;letter-spacing:-.03em}

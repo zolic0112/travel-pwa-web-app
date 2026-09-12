@@ -26,8 +26,12 @@
       var m = window.TRIP.meta;
       document.title = m.title;
       document.querySelector('meta[name="description"]').content = m.description;
-      try{var t=localStorage.getItem(m.id+'.theme');
-        if(t==='dark'||t==='light') document.documentElement.setAttribute('data-theme',t);}catch(e){}
+      /* There are only two themes. The system preference decides which one a
+         first-time visitor gets; after that the choice is theirs and stored. */
+      var t = null;
+      try{ t = localStorage.getItem(m.id+'.theme'); }catch(e){}
+      if(t!=='dark' && t!=='light') t = matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', t);
     })();
   </script>
 </head>
@@ -42,7 +46,6 @@
     <div class="topbar-actions">
       <div class="theme-switch" role="radiogroup" aria-label="外觀主題">
         <button class="theme-opt" data-theme-set="light" role="radio" aria-checked="false" aria-label="淺色"><span class="theme-ico" data-icon="sun" aria-hidden="true"></span></button>
-        <button class="theme-opt" data-theme-set="system" role="radio" aria-checked="true" aria-label="跟隨系統"><span class="theme-ico" data-icon="system" aria-hidden="true"></span></button>
         <button class="theme-opt" data-theme-set="dark" role="radio" aria-checked="false" aria-label="深色"><span class="theme-ico" data-icon="moon" aria-hidden="true"></span></button>
       </div>
       <button id="installBtn" class="btn primary" hidden>安裝 App</button>
