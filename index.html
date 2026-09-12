@@ -49,7 +49,9 @@
     </div>
   </header>
 
-  <main id="main">
+  <!-- tabindex -1 so the skip link can actually move focus here; without it
+       the link scrolls nothing and focus stays on the link. -->
+  <main id="main" tabindex="-1">
     <p id="nextStatus" class="sr-only" role="status" aria-atomic="true"></p>
 
     <div class="tabs" role="tablist" aria-label="主要頁籤">

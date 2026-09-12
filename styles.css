@@ -168,6 +168,8 @@ svg{display:block}
   padding:11px 16px;border-radius:var(--r-md);box-shadow:var(--shadow-md);
 }
 .skip-link:focus{transform:none}
+/* it takes focus programmatically; never paint a ring around the whole page */
+#main:focus{outline:none}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
 /* ── buttons ──────────────────────────────────────────────── */
