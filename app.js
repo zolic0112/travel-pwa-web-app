@@ -90,7 +90,9 @@ const ICO = {
   sun:P("<path d='M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z'/>"),
   moon:P("<path d='M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z'/>"),
   system:P("<path d='M208,40H48A24,24,0,0,0,24,64V176a24,24,0,0,0,24,24h72v16H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H136V200h72a24,24,0,0,0,24-24V64A24,24,0,0,0,208,40ZM48,56H208a8,8,0,0,1,8,8v80H40V64A8,8,0,0,1,48,56ZM208,184H48a8,8,0,0,1-8-8V160H216v16A8,8,0,0,1,208,184Z'/>"),
-  plus:P("<path d='M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z'/>")
+  plus:P("<path d='M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z'/>"),
+  copy:P("<path d='M184,64H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H184a8,8,0,0,0,8-8V72A8,8,0,0,0,184,64Zm-8,144H48V80H176ZM224,40V184a8,8,0,0,1-16,0V48H72a8,8,0,0,1,0-16H216A8,8,0,0,1,224,40Z'/>"),
+  check2:P("<path d='M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z'/>")
 };
 const TYPE_ICON={'高鐵':'train','轉乘':'transfer','航班':'plane','抵達':'pin','住宿':'bed','自由行':'sun','退房':'luggage','移動':'car','關鍵轉機':'alert','入境轉乘':'passport','景點':'camera','餐廳':'food','交通':'car','集合':'users','購物':'bag','其他':'dot','關鍵截止':'clock'};
 const TRANSPORT=new Set(['高鐵','轉乘','航班','移動','入境轉乘','關鍵轉機','交通']);
@@ -152,7 +154,7 @@ function routeStrip(r){
   return `<div class="route">
     <div class="port"><strong>${r.from}</strong><span>${r.fromSub||''}</span><b>${r.dep}</b></div>
     <div class="leg">
-      <span class="leg-no">${r.no}</span>
+      ${r.kind==='air'?copyChip(r.no,'班號'):`<span class="leg-no">${r.no}</span>`}
       <span class="leg-line"><i></i>${r.kind==='air'?ICO.plane:ICO.train}<i></i></span>
       <span class="leg-dur">${duration(r.dep,r.arr)}</span>
     </div>
@@ -174,7 +176,7 @@ function eventRow(e,dayIx){
     <div class="tl-rail"><span class="tl-node">${typeIcon(e.type)}</span></div>
     <div class="tl-card">
       <div class="card-top"><span class="chip type">${e.type}</span>${isNext?'<span class="next-flag">NEXT</span>':''}<span class="status ${statusClass(e.status)}">${e.status}</span></div>
-      <h3>${e.title}</h3>
+      <h3>${e.type==='住宿'?copyChip(e.title,'住宿名稱'):e.title}</h3>
       ${e.route?routeStrip(e.route):''}
       <div class="meta">${e.meta.map(x=>`<span class="meta-chip">${x}</span>`).join('')}</div>
       <p class="note">${e.note}</p>
@@ -288,6 +290,7 @@ function renderPlans(){
       <div class="plan-badges"><span class="badge">${p.type}</span>${p.duration?`<span class="badge">${escapeHtml(p.duration)}</span>`:''}</div>
     </div>
     <div class="plan-acts">
+      <button class="icon-btn" type="button" data-copy="${escapeHtml(p.note?`${p.title} ${p.note}`:p.title)}" aria-label="複製這筆行程的文字">${ICO.copy}</button>
       <button class="icon-btn edit-plan" data-id="${p.id}" aria-label="編輯">✎</button>
       <button class="icon-btn delete-plan" data-id="${p.id}" aria-label="刪除">×</button>
     </div></article>`).join('');
@@ -399,6 +402,33 @@ function setupTheme(){
     if(readTheme()==='system') applyTheme('system');
   });
 }
+
+/* ── copy ─────────────────────────────────────────────────── */
+function copyChip(text,label){
+  return `<button type="button" class="copy-chip" data-copy="${escapeHtml(text)}" `
+    + `aria-label="複製${label}：${escapeHtml(text)}">${escapeHtml(text)}${ICO.copy}</button>`;
+}
+async function copyText(el){
+  const text=el.dataset.copy;
+  try{
+    if(navigator.clipboard&&isSecureContext) await navigator.clipboard.writeText(text);
+    else{
+      const ta=document.createElement('textarea');
+      ta.value=text;ta.setAttribute('readonly','');
+      ta.style.cssText='position:fixed;top:0;opacity:0';
+      document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+    }
+    el.classList.add('copied');
+    setTimeout(()=>el.classList.remove('copied'),1100);
+    navigator.vibrate?.(8);
+    /* a pill toast is one line; echoing a long address wraps it into a block */
+    toast(`已複製 ${text.length>16?text.slice(0,16)+'…':text}`);
+  }catch{ toast('複製失敗，請手動記下'); }
+}
+addEventListener('click',e=>{
+  const el=e.target.closest('[data-copy]');
+  if(el){e.preventDefault();copyText(el);}
+});
 
 /* ── app chrome ───────────────────────────────────────────── */
 function setupHeaderCollapse(){
