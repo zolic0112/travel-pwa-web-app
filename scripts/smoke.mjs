@@ -230,17 +230,37 @@ console.log('\n── every control does what it says ──');
   await page.click('#resetTodos'); await page.waitForTimeout(400);
   check('reset clears every tick', (await val(() => document.querySelector('#todoPercent').textContent)) === '0%');
 
-  for (const t of ['dark', 'light', 'system']) {
+  check('the switch offers two themes, not three',
+    (await val(() => [...document.querySelectorAll('.theme-opt')].map(b => b.dataset.themeSet).join(',')))
+    === 'light,dark');
+  for (const t of ['dark', 'light']) {
     await page.click(`.theme-opt[data-theme-set="${t}"]`); await page.waitForTimeout(300);
     const s = await val(() => ({ attr: document.documentElement.getAttribute('data-theme'),
       checked: document.querySelector('.theme-opt[aria-checked=true]')?.dataset.themeSet,
       metas: document.querySelectorAll('meta[name=theme-color]').length }));
-    check(`the ${t} theme applies and leaves one theme-color`, s.checked === t && s.metas === 1
-      && (t === 'system' ? s.attr === null : s.attr === t), JSON.stringify(s));
+    check(`the ${t} theme applies and leaves one theme-color`,
+      s.checked === t && s.metas === 1 && s.attr === t, JSON.stringify(s));
   }
   await page.click('.theme-opt[data-theme-set="dark"]'); await page.waitForTimeout(250);
   await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForTimeout(700);
   check('the theme survives a reload', (await val(() => document.documentElement.getAttribute('data-theme'))) === 'dark');
+
+  /* In dark mode elevation reads as lightness. The hero was once darker than
+     the page, which put it behind the background and made it disappear. */
+  const ladder = await val(() => {
+    const L = s => { const [r, g, b] = s.match(/-?[\d.]+/g).slice(0, 3).map(Number).map(x => {
+      x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const bgOf = s => getComputedStyle(document.querySelector(s)).backgroundColor;
+    const grad = getComputedStyle(document.querySelector('#nowPanel')).backgroundImage.match(/rgb\([^)]*\)/g);
+    return { page: L(bgOf('body')), card: L(bgOf('.tl-card')), hero: L(grad[grad.length - 1]),
+      chip: L(bgOf('.meta-chip')) };
+  });
+  check('dark elevation steps up: page < card < inner chip', ladder.page < ladder.card && ladder.card < ladder.chip,
+    JSON.stringify(ladder));
+  check('the hero sits above the page rather than behind it', ladder.hero > ladder.page * 1.5,
+    `hero ${ladder.hero.toFixed(4)} vs page ${ladder.page.toFixed(4)}`);
+  await page.click('.theme-opt[data-theme-set="dark"]'); await page.waitForTimeout(200);
 
   await page.click('.tab[data-view="itinerary"]'); await page.waitForTimeout(250);
   await page.click('#dismissBanner'); await page.waitForTimeout(250);
