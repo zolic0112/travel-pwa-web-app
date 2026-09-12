@@ -432,9 +432,12 @@ function setupSwipe(){
   let x0=null,y0=null,lock=false;
   main.addEventListener('touchstart',e=>{
     if(e.touches.length!==1){x0=null;return;}
-    /* do not fight a horizontally scrollable strip or table under the finger */
-    lock=!!e.target.closest('.day-strip,.table-wrap,dialog');
-    x0=e.touches[0].clientX;y0=e.touches[0].clientY;
+    const t=e.touches[0];
+    /* do not fight a horizontally scrollable strip or table under the finger,
+       and leave the screen edges to the system back/forward gestures */
+    lock=!!e.target.closest('.day-strip,.table-wrap,dialog')
+      || t.clientX<24 || t.clientX>innerWidth-24;
+    x0=t.clientX;y0=t.clientY;
   },{passive:true});
   main.addEventListener('touchend',e=>{
     if(x0===null||lock) return;

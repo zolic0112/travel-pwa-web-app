@@ -116,6 +116,27 @@
 }
 
 *{box-sizing:border-box}
+/* ── native feel ──────────────────────────────────────────────
+   Kill the interactions that read as "this is a web page": the grey tap
+   flash, the long-press copy/share callout, text selection on chrome,
+   double-tap zoom, and dragging elements out of the page.
+   Pinch zoom is deliberately left alone — removing it fails WCAG 1.4.4,
+   and touch-action:manipulation only drops the double-tap gesture. */
+html{
+  -webkit-tap-highlight-color:transparent;
+  overscroll-behavior:none;
+}
+body{
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;user-select:none;
+  touch-action:manipulation;
+}
+img,svg,a{-webkit-user-drag:none;user-drag:none}
+/* Typing needs selection back, and a caret needs a real text cursor. */
+input,textarea,select{
+  -webkit-touch-callout:default;
+  -webkit-user-select:text;user-select:text;
+}
 /* keep keyboard focus clear of the sticky header/tabs and the fixed banner (WCAG 2.2 AA) */
 html{-webkit-text-size-adjust:100%;scroll-padding-top:152px;scroll-padding-bottom:96px}
 @media (max-width:760px){html{scroll-padding-top:138px}}
@@ -158,13 +179,9 @@ svg{display:block}
 }
 .btn:active{transform:translateY(1px)}
 .btn.primary{background:var(--brand);color:var(--on-brand);box-shadow:var(--shadow-sm)}
-.btn.primary:hover{background:var(--brand-deep)}
 .btn.quiet{background:var(--surface-2);color:var(--text-2);border-color:var(--line)}
-.btn.quiet:hover{background:var(--sunken)}
 .btn.on-dark{background:rgba(255,255,255,.13);color:var(--on-ink);border-color:rgba(255,255,255,.16)}
-.btn.on-dark:hover{background:rgba(255,255,255,.2)}
 .link-btn{border:0;background:transparent;color:var(--brand);font:inherit;font-weight:700;font-size:12px;cursor:pointer;padding:12px 0;min-height:44px}
-.link-btn:hover{text-decoration:underline}
 
 /* ── header ───────────────────────────────────────────────── */
 .topbar{
@@ -193,11 +210,10 @@ svg{display:block}
   border-radius:var(--r-sm);transition:background .15s,color .15s;padding:0;
 }
 .theme-opt svg{width:17px;height:17px}
-.theme-opt:hover{color:var(--text-2)}
 .theme-opt:active{background:var(--surface-2)}
 .theme-opt[aria-checked="true"]{background:var(--surface);color:var(--brand);box-shadow:var(--shadow-sm)}
 
-main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1}
+main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1;touch-action:pan-y}
 
 /* ── next-event panel ─────────────────────────────────────── */
 .view .now-panel{margin-bottom:4px}
@@ -251,7 +267,6 @@ main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1}
 }
 .tab-ico{display:grid;place-items:center}
 .tab-ico svg{width:15px;height:15px}
-.tab:hover{color:var(--text-2)}
 .tab.active{background:var(--surface);color:var(--brand-deep);box-shadow:var(--shadow-sm)}
 .view{display:none}
 .view.active{display:block;animation:viewIn .24s var(--ease-out) both}
@@ -266,7 +281,7 @@ main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1}
 
 /* ── day strip ────────────────────────────────────────────── */
 .day-strip{
-  display:flex;gap:8px;overflow-x:auto;padding:2px 2px 9px;margin-bottom:4px;
+  display:flex;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;padding:2px 2px 9px;margin-bottom:4px;
   scroll-snap-type:x proximity;scrollbar-width:thin;
 }
 .day-chip{
@@ -281,13 +296,14 @@ main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1}
 .day-chip .dc-dot{display:flex;gap:3px;margin-top:6px}
 .day-chip .dc-dot i{width:4px;height:4px;border-radius:var(--r-pill);background:var(--line);display:block}
 .day-chip .dc-dot i.on{background:var(--brand)}
-.day-chip .dc-dot i.day-chip:hover{border-color:var(--brand)}
+.day-chip .dc-dot i.risk{background:var(--danger)}
 .day-chip:active{background:var(--sunken)}
 .day-chip.active{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
 .day-chip.active .dc-date{color:var(--on-brand)}
 .day-chip.active .dc-dot i{background:color-mix(in srgb,var(--on-brand) 45%,transparent)}
 .day-chip.active .dc-dot i.on{background:var(--on-brand)}
-.day-chip.active .dc-dot i.day-chip.all{min-width:auto;display:grid;place-items:center;padding:8px 14px;font-size:12.5px;font-weight:700}
+.day-chip.active .dc-dot i.risk{background:#FFD3CD}
+.day-chip.all{min-width:auto;display:grid;place-items:center;padding:8px 14px;font-size:12.5px;font-weight:700}
 
 /* ── timeline ─────────────────────────────────────────────── */
 .timeline{margin-top:4px}
@@ -386,7 +402,6 @@ main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1}
   border-top:1px solid var(--line-soft);
 }
 .stack.grouped>*:first-child{border-top:0}
-.stack.grouped>.todo:hover,.stack.grouped>.plan-card:hover{background:var(--surface-2)}
 .stack.grouped>.plan-card:active{background:var(--sunken)}
 .tl-card{transition:background .12s}
 .tl-row:active .tl-card{background:var(--surface-2)}
@@ -414,7 +429,6 @@ main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1}
   padding:13px 15px;cursor:pointer;box-shadow:var(--shadow-sm);
   transition:border-color .15s,opacity .2s;
 }
-.todo:hover{border-color:var(--brand)}
 .todo:active{background:var(--sunken)}
 .todo input{position:absolute;opacity:0;width:0;height:0}
 .check{
@@ -447,7 +461,7 @@ main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1}
 .cc-item .sw{width:9px;height:9px;border-radius:var(--r-xs);flex:none}
 .cc-item b{font-family:var(--mono);font-weight:600;letter-spacing:-.02em}
 .cc-item span{color:var(--muted)}
-.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);box-shadow:var(--shadow-sm)}
+.table-wrap{overflow-x:auto;overscroll-behavior-x:contain;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);box-shadow:var(--shadow-sm)}
 table{width:100%;border-collapse:collapse;min-width:540px}
 th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line-soft);font-size:12.5px}
 tr:last-child td{border-bottom:0}
@@ -482,7 +496,6 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
   border-radius:var(--r-sm);cursor:pointer;font-size:15px;line-height:1;transition:.15s;
   min-width:44px;min-height:44px;display:grid;place-items:center;padding:0;
 }
-.icon-btn:hover{color:var(--brand);border-color:var(--brand)}
 .icon-btn:active{background:var(--sunken)}
 .empty-state{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r-lg);padding:34px 20px;text-align:center;color:var(--muted);display:grid;justify-items:center;gap:5px}
 .empty-icon{width:40px;height:40px;border-radius:var(--r-md);background:var(--surface-2);display:grid;place-items:center;color:var(--muted);margin-bottom:5px}
@@ -528,7 +541,6 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
 .cb-text strong{display:block;font-size:12px;font-weight:900;letter-spacing:.02em}
 .cb-text span{display:block;opacity:.85;margin-top:1px;line-height:1.45}
 .cb-close{border:0;background:transparent;color:#FFC9C1;font-size:20px;line-height:1;cursor:pointer;min-width:44px;min-height:44px;display:grid;place-items:center;border-radius:var(--r-sm)}
-.cb-close:hover{background:rgba(255,255,255,.1)}
 
 footer{width:100%;max-width:1000px;margin:22px auto 0;padding:0 20px 24px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:11.5px}
 
@@ -542,7 +554,6 @@ dialog::backdrop{background:rgba(6,20,26,.6);backdrop-filter:blur(3px)}
 .dialog-head{display:flex;justify-content:space-between;align-items:center;padding:15px 18px;border-bottom:1px solid var(--line-soft)}
 .dialog-head h2{font-size:16px;font-weight:900}
 .dialog-head button{font-size:22px;border:0;background:transparent;color:var(--muted);cursor:pointer;line-height:1;min-width:44px;min-height:44px;display:grid;place-items:center;border-radius:var(--r-sm)}
-.dialog-head button:hover{background:var(--surface-2);color:var(--text)}
 .form-grid{padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .form-grid label{font-size:11.5px;font-weight:800;color:var(--muted);display:grid;gap:5px}
 .form-grid .full{grid-column:1/-1}
@@ -617,4 +628,20 @@ dialog::backdrop{background:rgba(6,20,26,.6);backdrop-filter:blur(3px)}
   /* the footer sits outside main, so it needs its own clearance for the bar */
   footer{flex-direction:column;gap:7px;align-items:flex-start;
     padding-bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 20px)}
+}
+
+/* Touch devices latch :hover after a tap, so these only apply to a real pointer. */
+@media (hover:hover) and (pointer:fine){
+  .btn.primary:hover{background:var(--brand-deep)}
+  .btn.quiet:hover{background:var(--sunken)}
+  .btn.on-dark:hover{background:rgba(255,255,255,.2)}
+  .link-btn:hover{text-decoration:underline}
+  .theme-opt:hover{color:var(--text-2)}
+  .tab:hover{color:var(--text-2)}
+  .day-chip:hover{border-color:var(--brand)}
+  .stack.grouped>.todo:hover,.stack.grouped>.plan-card:hover{background:var(--surface-2)}
+  .todo:hover{border-color:var(--brand)}
+  .icon-btn:hover{color:var(--brand);border-color:var(--brand)}
+  .cb-close:hover{background:rgba(255,255,255,.1)}
+  .dialog-head button:hover{background:var(--surface-2);color:var(--text)}
 }
