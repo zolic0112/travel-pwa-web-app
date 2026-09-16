@@ -545,11 +545,31 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
 .empty-icon svg{width:20px;height:20px}
 .empty-state strong{color:var(--text);font-size:14.5px}
 
-/* ── my own to-dos ────────────────────────────────────────── */
-.section-head.sub-head{margin-top:30px;align-items:center}
-.section-head.sub-head h2{font-size:var(--t-h2)}
-.section-head .count{font-family:var(--mono);font-size:12px;color:var(--muted)}
-.mine-add{display:flex;gap:8px;margin-bottom:10px}
+/* ── two lists, side by side rather than stacked ───────────
+   Stacked, the add field landed 522px below the fold behind nine
+   shared items — reachable only by scrolling, which reads as a
+   control that does nothing. */
+.seg-tabs{
+  display:grid;grid-template-columns:1fr 1fr;gap:3px;
+  background:var(--bar);padding:3px;border-radius:var(--r-md);
+  border:1px solid var(--line-soft);margin-bottom:14px;
+}
+.seg-tab{
+  border:0;background:transparent;font:inherit;cursor:pointer;
+  font-size:13.5px;font-weight:700;color:var(--muted);
+  border-radius:var(--r-sm);min-height:44px;padding:0 10px;
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  transition:background .15s,color .15s;
+}
+.seg-tab.active{background:var(--bar-active);color:var(--brand-deep);box-shadow:var(--shadow-sm)}
+.seg-n{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--muted)}
+.seg-tab.active .seg-n{color:var(--brand)}
+.seg-n:empty{display:none}
+/* no display rule on .pane itself: a `.pane{display:block}` would beat
+   the [hidden] attribute and leave both panes on screen at once */
+.pane[hidden]{display:none}
+
+.mine-add{display:flex;gap:8px;margin-bottom:12px}
 .mine-add input{
   flex:1;min-width:0;border:1px solid var(--line);border-radius:var(--r-md);
   padding:11px 13px;min-height:44px;
@@ -558,19 +578,15 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
 }
 .mine-add input:focus{border-color:var(--brand);outline:none;box-shadow:0 0 0 3px var(--brand-soft)}
 .mine-add input::placeholder{color:var(--muted)}
-/* the row's own padding moves onto the hit area, so the whole label is
-   tappable and the delete button sits outside it */
 .todo.mine{display:flex;align-items:center;gap:4px;padding:0 8px 0 0}
 .todo.mine .todo-hit{flex:1;min-width:0;display:flex;align-items:flex-start;gap:12px;
   padding:13px 4px 13px 14px;cursor:pointer}
 .todo.mine .todo-body h3{font-size:var(--t-h3)}
 .todo.mine.done .todo-body h3{color:var(--muted);text-decoration:line-through}
-.mine-empty{font-size:12.5px;color:var(--muted);padding:2px 2px 0}
 /* one quiet × per row; a boxed button on every line reads as three
    competing controls rather than one row with an affordance */
 .todo.mine .del-mine{border-color:transparent;background:transparent;color:var(--muted)}
 .todo.mine .del-mine:active{background:var(--sunken)}
-.empty-state>span{font-size:12.5px;max-width:34ch}
 
 .toast{
   position:fixed;z-index:var(--z-toast);left:50%;transform:translateX(-50%) translateY(14px);

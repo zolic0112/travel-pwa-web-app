@@ -220,7 +220,7 @@ function renderTodos(){
   const mine=getMine();
   $('#mineList').innerHTML=mine.map(mineRow).join('');
   $('#mineEmpty').hidden=mine.length>0;
-  $('#mineCount').textContent=mine.length?`${mine.filter(m=>m.done).length} / ${mine.length}`:'';
+  $('#mineCount').textContent=mine.length?`${mine.filter(m=>m.done).length}/${mine.length}`:'';
 
   $$('#todoList input').forEach(cb=>cb.addEventListener('change',()=>{
     const s=getTodoState();
@@ -239,6 +239,7 @@ function renderTodos(){
 
   const done=trip.todos.filter(t=>state[t.id]).length, total=trip.todos.length,
         pct=total?Math.round(done/total*100):0;
+  $('#sharedCount').textContent=`${done}/${total}`;
   $('#todoProgressText').textContent=`${done} / ${total} 完成`;
   $('#todoPercent').textContent=`${pct}%`;
   const C=2*Math.PI*31, ring=$('#todoRing');
@@ -247,12 +248,39 @@ function renderTodos(){
   $('#todoNext').textContent=next?`下一項：${next.due} · ${next.title}`:'全部完成，出發前再複查一次即可';
 }
 
+/* Which list you are looking at. The two are never on screen together:
+   stacked, the second one is only reachable by scrolling past the first. */
+function showTodoPane(name){
+  $$('.seg-tab').forEach(b=>{
+    const on=b.dataset.pane===name;
+    b.classList.toggle('active',on);
+    b.setAttribute('aria-selected',String(on));
+    b.tabIndex=on?0:-1;
+  });
+  $('#paneShared').hidden=name!=='shared';
+  $('#paneMine').hidden=name!=='mine';
+}
+
 function setupMine(){
+  const tabs=$$('.seg-tab');
+  tabs.forEach((b,i)=>{
+    b.addEventListener('click',()=>showTodoPane(b.dataset.pane));
+    b.addEventListener('keydown',e=>{
+      const step={ArrowRight:1,ArrowLeft:-1,Home:-i,End:tabs.length-1-i}[e.key];
+      if(step===undefined) return;
+      e.preventDefault();
+      const next=tabs[(i+step+tabs.length)%tabs.length];
+      showTodoPane(next.dataset.pane);next.focus();
+    });
+  });
+
   const form=$('#mineForm'), input=$('#mineInput');
   form.addEventListener('submit',e=>{
     e.preventDefault();
     const title=input.value.trim();
-    if(!title) return;
+    /* an empty submit used to do nothing at all, which is indistinguishable
+       from a broken button; put the cursor where the problem is */
+    if(!title){ input.focus(); toast('先輸入一個名稱'); return; }
     if(saveMine([...getMine(),{id:`m${Date.now()}`,title,done:false}])){
       input.value='';toast('已加入');
     }

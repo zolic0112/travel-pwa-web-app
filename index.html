@@ -110,33 +110,51 @@
 
     <section id="todos" class="view" role="tabpanel" aria-labelledby="tab-todos" tabindex="0">
       <div class="section-head">
-        <div><h2>出發前待辦</h2><p>勾選狀態會保存在此裝置。</p></div>
+        <div><h2>待辦</h2><p>共同的所有人一樣；我的只留在這台裝置。</p></div>
       </div>
-      <div class="progress-card">
-        <svg class="ring" viewBox="0 0 76 76" aria-hidden="true">
-          <circle class="ring-bg" cx="38" cy="38" r="31"></circle>
-          <circle class="ring-fg" id="todoRing" cx="38" cy="38" r="31"></circle>
-        </svg>
-        <div class="progress-meta">
-          <strong class="num" id="todoPercent">0%</strong>
-          <span id="todoProgressText">0 / 0 完成</span>
-          <span class="progress-note" id="todoNext">—</span>
-        </div>
-        <button id="resetTodos" class="btn quiet">重設</button>
-      </div>
-      <div id="todoList" class="stack grouped"></div>
 
-      <div class="section-head sub-head">
-        <div><h2>我的</h2><p>只有這台裝置看得到，不會給同行的人。</p></div>
-        <span class="count num" id="mineCount"></span>
+      <div class="seg-tabs" role="tablist" aria-label="待辦分類">
+        <button class="seg-tab active" type="button" role="tab" id="segShared"
+          aria-selected="true" aria-controls="paneShared" data-pane="shared">
+          共同<span class="seg-n" id="sharedCount"></span>
+        </button>
+        <button class="seg-tab" type="button" role="tab" id="segMine" tabindex="-1"
+          aria-selected="false" aria-controls="paneMine" data-pane="mine">
+          我的<span class="seg-n" id="mineCount"></span>
+        </button>
       </div>
-      <form id="mineForm" class="mine-add">
-        <input id="mineInput" type="text" maxlength="40" placeholder="加一件自己的事，例如：換錢"
-          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" />
-        <button class="btn primary" type="submit">加入</button>
-      </form>
-      <div id="mineList" class="stack grouped"></div>
-      <p id="mineEmpty" class="mine-empty" hidden>還沒有自己的項目。</p>
+
+      <div class="pane" id="paneShared" role="tabpanel" aria-labelledby="segShared">
+        <div class="progress-card">
+          <svg class="ring" viewBox="0 0 76 76" aria-hidden="true">
+            <circle class="ring-bg" cx="38" cy="38" r="31"></circle>
+            <circle class="ring-fg" id="todoRing" cx="38" cy="38" r="31"></circle>
+          </svg>
+          <div class="progress-meta">
+            <strong class="num" id="todoPercent">0%</strong>
+            <span id="todoProgressText">0 / 0 完成</span>
+            <span class="progress-note" id="todoNext">—</span>
+          </div>
+          <button id="resetTodos" class="btn quiet">重設</button>
+        </div>
+        <div id="todoList" class="stack grouped"></div>
+      </div>
+
+      <div class="pane" id="paneMine" role="tabpanel" aria-labelledby="segMine" hidden>
+        <!-- the field sits at the top of its own pane: always in the same place,
+             never behind a list, and never pushed around when items are added -->
+        <form id="mineForm" class="mine-add">
+          <input id="mineInput" type="text" maxlength="40" placeholder="加一件自己的事，例如：換錢"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" />
+          <button class="btn primary" type="submit">加入</button>
+        </form>
+        <div id="mineList" class="stack grouped"></div>
+        <div id="mineEmpty" class="empty-state" hidden>
+          <span class="empty-icon" data-icon="check" aria-hidden="true"></span>
+          <strong>還沒有自己的項目</strong>
+          <span>換錢、買伴手禮、提醒自己的事——只有這台裝置看得到。</span>
+        </div>
+      </div>
     </section>
 
     <section id="costs" class="view" role="tabpanel" aria-labelledby="tab-costs" tabindex="0">
