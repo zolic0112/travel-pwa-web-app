@@ -441,9 +441,160 @@ function announceNext(next,ms){
   $('#nextStatus').textContent=`下一個行程：${next.title}，${stamp(next.at)}，${countdownText(ms)}`;
 }
 function updateClock(){
+  renderFollow();
   const fmt=new Intl.DateTimeFormat('zh-TW',{timeZone:TZ,month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false});
   $('#clockText').textContent=`${tzLabel} · ${fmt.format(new Date())}`;
   updateNextEvent();
+}
+
+/* ── follower mode ────────────────────────────────────────────
+   A smaller product, not the same one with the edit buttons greyed out:
+   one order filling the screen, and nothing else to look at. Everything
+   it shows comes from an event's `brief`. */
+const MODE_KEY=ns('mode');
+const LEAD_MIN=45;   /* when a thing stops being "later" and becomes "soon" */
+
+function briefs(){
+  return trip.days.flatMap((d,day)=>d.events
+    .filter(e=>e.brief)
+    .map(e=>({e,day,from:+new Date(e.brief.window.from),to:+new Date(e.brief.window.to)})))
+    .sort((a,b)=>a.from-b.from);
+}
+function todayISO(){
+  return new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'})
+    .format(new Date());
+}
+/* what the screen should be showing at this moment */
+function followState(now=Date.now()){
+  const all=briefs();
+  const item=all.find(x=>x.to>now);
+  if(!item) return {kind:'done'};
+  const today=todayISO();
+  if(item.e.brief.window.from.slice(0,10)!==today) return {kind:'free',item};
+  if(now<item.from-LEAD_MIN*60000) return {kind:'later',item};
+  if(now<item.from) return {kind:'soon',item};
+  return {kind:item.e.level==='critical'?'tight':'go',item};
+}
+/* a plain pair, not markup: the screen wants one number and one word */
+function span(ms){
+  if(ms<=0) return {n:'現在',u:''};
+  const min=Math.round(ms/60000), d=Math.floor(min/1440), h=Math.floor((min%1440)/60), m=min%60;
+  if(d>0) return {n:String(d),u:'天後'};
+  if(h>0) return {n:`${h}:${String(m).padStart(2,'0')}`,u:'小時'};
+  return {n:String(m),u:'分鐘'};
+}
+function clockAt(iso){
+  return new Intl.DateTimeFormat('en-GB',{timeZone:TZ,hour:'2-digit',minute:'2-digit',hour12:false})
+    .format(new Date(iso));
+}
+
+let followOpen=false;
+function setFollowOpen(o){
+  followOpen=o;
+  $('#flDetail').hidden=!o;
+  $('#flMore').setAttribute('aria-expanded',String(o));
+  $('#flCard').classList.toggle('open',o);
+  $('#flMoreLabel').textContent=o?'收起來':'還要注意什麼';
+}
+
+function renderFollow(){
+  if(document.documentElement.dataset.mode!=='follow') return;
+  const now=Date.now(), st=followState(now), card=$('#flCard');
+  $('#flTrip').textContent=meta.title;
+  $('#flWhen').textContent=new Intl.DateTimeFormat('zh-TW',
+    {timeZone:TZ,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})
+    .format(new Date(now));
+
+  const quiet=st.kind==='done'||st.kind==='free';
+  card.classList.toggle('hot',st.kind==='tight');
+  card.classList.toggle('calm',quiet);
+  ['#flRoute','#flWin','#flSteps','#flMore'].forEach(id=>$(id).hidden=quiet);
+  if(quiet) setFollowOpen(false);
+
+  /* today's other stops, so you know where you are in the day */
+  const today=todayISO();
+  const mine=briefs().filter(x=>x.e.brief.window.from.slice(0,10)===today);
+  const here=st.item?mine.indexOf(st.item):-1;
+  $('#flDots').innerHTML=mine.length>1
+    ? mine.map((_,i)=>`<i class="${i<here?'past':i===here?'here':''}"></i>`).join('') : '';
+
+  if(st.kind==='done'){
+    $('#flGlyph').innerHTML=icon('check2');
+    $('#flKicker').textContent='';
+    $('#flLine').textContent='旅程完成';
+    $('#flBecause').textContent='所有固定行程都結束了。';
+    $('#flGround').textContent='';
+    return;
+  }
+  if(st.kind==='free'){
+    const b=st.item.e.brief;
+    $('#flGlyph').innerHTML=icon('sun');
+    $('#flKicker').textContent='今天';
+    $('#flLine').textContent='沒有要趕的事';
+    $('#flBecause').textContent=
+      `下一件是 ${st.item.e.brief.window.from.slice(5,10).replace('-','/')} ${clockAt(b.window.from)}：${b.line}。在那之前不用開這個。`;
+    $('#flGround').textContent='';
+    return;
+  }
+
+  const {e}=st.item, b=e.brief, w=b.window;
+  const from=st.item.from, to=st.item.to, wall=w.wall?+new Date(w.wall):null;
+  $('#flGlyph').innerHTML=typeIcon(e.type);
+  $('#flKicker').textContent={later:'接下來',soon:'快到了',go:'現在',tight:'這段要抓緊'}[st.kind];
+  $('#flLine').textContent=st.kind==='soon'||st.kind==='later'?b.line:b.line;
+  $('#flBecause').textContent=b.because;
+
+  /* before it starts, the number is time until it starts; after, time left
+     against the wall — which is the deadline, not the departure */
+  const target=(st.kind==='later'||st.kind==='soon')?from:(wall||to);
+  const s=span(target-now);
+  $('#flCd').textContent=s.n;
+  $('#flCdu').textContent=(st.kind==='later'||st.kind==='soon')
+    ? `${s.u}${s.u?'後':''}${b.line}` : `${s.u?s.u+'，':''}到${w.wallLabel||w.toLabel}`;
+
+  const pct=t=>Math.max(0,Math.min(100,(t-from)/(to-from)*100));
+  $('#flFill').style.width=pct(now)+'%';
+  $('#flNow').style.left=Math.max(2,pct(now))+'%';
+  const hasWall=wall!=null;
+  $('#flWall').hidden=!hasWall; $('#flWallTag').hidden=!hasWall;
+  if(hasWall){
+    $('#flWall').style.left=pct(wall)+'%';
+    $('#flWallTag').style.left=pct(wall)+'%';
+    $('#flWallTime').textContent=clockAt(w.wall);
+    $('#flWallWhat').textContent=w.wallLabel;
+  }
+  $('#flL1').textContent=clockAt(w.from); $('#flL1t').textContent=w.fromLabel;
+  $('#flL2').textContent=clockAt(w.to);   $('#flL2t').textContent=w.toLabel;
+
+  const r=e.route;
+  $('#flRoute').hidden=!r;
+  if(r){
+    $('#flFrom').textContent=r.from; $('#flFromSub').textContent=r.fromSub||'';
+    $('#flTo').textContent=r.to;     $('#flToSub').textContent=r.toSub||'';
+    $('#flLegIcon').innerHTML=r.kind==='air'?ICO.plane:ICO.train;
+  }
+  $('#flSteps').innerHTML=b.steps
+    .map((x,i)=>`${i?'<i>→</i>':''}<b>${escapeHtml(x)}</b>`).join('');
+  $('#flSteps2').textContent=b.steps.join(' → ');
+  $('#flNeed').textContent=b.need;
+  $('#flFallback').textContent=b.fallback;
+  $('#flGround').textContent=meta.groundTruth||'實際時間與地點以現場公告為準';
+}
+
+function setMode(m){
+  document.documentElement.dataset.mode=m;
+  $('#follow').hidden=m!=='follow';
+  $('#modeBtn').textContent=m==='follow'?'看完整行程':'跟隊模式';
+  try{localStorage.setItem(MODE_KEY,m)}catch{}
+  if(m==='follow'){ setFollowOpen(false); renderFollow(); scrollTo(0,0); }
+}
+function setupFollow(){
+  let saved=null;
+  try{saved=localStorage.getItem(MODE_KEY)}catch{}
+  setMode(saved==='follow'?'follow':'lead');
+  $('#modeBtn').onclick=()=>setMode(document.documentElement.dataset.mode==='follow'?'lead':'follow');
+  $('#flExit').onclick=()=>setMode('lead');
+  $('#flMore').onclick=()=>setFollowOpen($('#flDetail').hidden);
 }
 
 /* ── theme ────────────────────────────────────────────────── */
@@ -702,6 +853,7 @@ renderCosts();
 setupPlanner();
 setupSources();
 setupMine();
+setupFollow();
 setupBanner();
 setupPWA();
 setupNextJump();

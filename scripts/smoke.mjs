@@ -441,6 +441,16 @@ console.log('\n── it behaves like an app on a phone, not like a web page ─
   check('a closed dialog is out of the way', await val(() =>
     [...document.querySelectorAll('dialog:not([open])')].every(d => getComputedStyle(d).display === 'none')));
 
+  /* the hidden attribute must actually hide, everywhere, in every view */
+  const showing = [];
+  for (const v of ['itinerary', 'planner', 'todos', 'costs']) {
+    await page.click(`.tab[data-view="${v}"]`); await page.waitForTimeout(200);
+    showing.push(...await val(() => [...document.querySelectorAll('[hidden]')]
+      .filter(el => getComputedStyle(el).display !== 'none')
+      .map(el => (el.id || el.className || el.tagName) + ':' + getComputedStyle(el).display)));
+  }
+  check('nothing marked hidden is still painted', showing.length === 0, showing.slice(0, 5).join(', '));
+
   check('no browser confirm() or alert() interrupts a tap', await val(() => {
     let hit = false;
     const spy = () => { hit = true; return true; };
@@ -467,6 +477,72 @@ console.log('\n── it behaves like an app on a phone, not like a web page ─
 
   check('no errors', !errs.length, errs[0] || '');
   await ctx.close();
+}
+
+console.log('\n── follower mode shows one order and nothing else ──');
+{
+  const read = p => p.evaluate(() => ({
+    kicker: document.querySelector('#flKicker').textContent,
+    line: document.querySelector('#flLine').textContent,
+    cd: document.querySelector('#flCd').textContent,
+    hot: document.querySelector('#flCard').classList.contains('hot'),
+    calm: document.querySelector('#flCard').classList.contains('calm'),
+    wall: document.querySelector('#flWallTag').hidden ? null : document.querySelector('#flWallTime').textContent,
+    ends: document.querySelector('#flL1').textContent + '→' + document.querySelector('#flL2').textContent,
+    steps: [...document.querySelectorAll('#flSteps b')].map(x => x.textContent).join('/'),
+    tabs: getComputedStyle(document.querySelector('.tabs')).display,
+  }));
+  const follow = `localStorage.setItem('my2026.mode','follow')`;
+
+  {
+    const { page, ctx, errs } = await open({ seed: follow, clock: '2026-10-13T11:45:00+08:00' });
+    const r = await read(page);
+    check('the KUL transfer reads as the tight one', r.hot && r.kicker === '這段要抓緊' && r.line === '直接去長榮報到',
+      `${r.kicker} / ${r.line}`);
+    /* the whole point of the scale: the deadline is the counter, not the flight */
+    check('it counts down to the counter closing, not to departure', r.cd === '2:45' && r.wall === '14:30',
+      `${r.cd}, wall ${r.wall}`);
+    check('and the scale spans landing to take-off', r.ends === '11:45→15:30', r.ends);
+    check('the steps are there to be counted, not read', r.steps === '領行李/轉機櫃檯/報到託運', r.steps);
+    check('nothing else is on screen', r.tabs === 'none');
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+  for (const [clock, want] of [
+    ['2026-10-13T06:50:00+08:00', '快到了'],
+    ['2026-10-13T07:20:00+08:00', '現在'],
+  ]) {
+    const { page, ctx } = await open({ seed: follow, clock });
+    check(`${clock.slice(11, 16)} reads as 「${want}」`, (await read(page)).kicker === want, (await read(page)).kicker);
+    await ctx.close();
+  }
+  {
+    const { page, ctx } = await open({ seed: follow, clock: '2026-10-11T10:20:00+08:00' });
+    const r = await read(page);
+    check('a free day says so and points at the next thing', r.calm && r.line === '沒有要趕的事'
+      && (await page.evaluate(() => document.querySelector('#flBecause').textContent)).includes('10/13'), r.line);
+    await ctx.close();
+  }
+  {
+    const { page, ctx } = await open({ seed: follow, clock: '2026-10-14T09:00:00+08:00' });
+    check('after the trip it is finished', (await read(page)).line === '旅程完成');
+    await ctx.close();
+  }
+  {
+    const { page, ctx } = await open({ seed: follow, clock: '2026-10-13T11:45:00+08:00' });
+    const val = fn => page.evaluate(fn);
+    await page.click('#flExit'); await page.waitForTimeout(300);
+    check('leaving returns the full app', (await val(() => document.querySelector('#follow').hidden)) === true
+      && (await val(() => getComputedStyle(document.querySelector('.tabs')).display)) !== 'none');
+    await page.click('#modeBtn'); await page.waitForTimeout(300);
+    check('the header button goes back in', (await val(() => !document.querySelector('#follow').hidden)));
+    await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForTimeout(800);
+    check('the mode is remembered', (await val(() => !document.querySelector('#follow').hidden)));
+    await page.click('#flMore'); await page.waitForTimeout(300);
+    check('the fallback is the last thing you see when expanded',
+      (await val(() => document.querySelector('#flFallback').textContent)).includes('長榮改票'));
+    await ctx.close();
+  }
 }
 
 console.log('\n── the app carries no knowledge of one particular trip ──');
