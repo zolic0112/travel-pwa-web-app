@@ -46,7 +46,7 @@ const open = async (opts = {}) => {
   const page = await ctx.newPage();
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.goto(URL, { waitUntil: 'domcontentloaded' });
+  await page.goto(URL + (opts.query || ''), { waitUntil: 'domcontentloaded' });
   if (opts.seed) { await page.evaluate(opts.seed); await page.reload({ waitUntil: 'domcontentloaded' }); }
   await page.waitForTimeout(700);
   return { page, ctx, errs };
@@ -526,6 +526,39 @@ console.log('\n── follower mode shows one order and nothing else ──');
   {
     const { page, ctx } = await open({ seed: follow, clock: '2026-10-14T09:00:00+08:00' });
     check('after the trip it is finished', (await read(page)).line === '旅程完成');
+    await ctx.close();
+  }
+  /* the link is the product: four people open it and are in follower mode
+     without being told which button to press */
+  {
+    const { page, ctx, errs } = await open({ query: '?mode=follow', clock: '2026-10-13T11:45:00+08:00' });
+    const val = fn => page.evaluate(fn);
+    check('?mode=follow lands straight in follower mode with nothing stored',
+      (await val(() => !document.querySelector('#follow').hidden)));
+    check('and the parameter is gone from the URL afterwards',
+      !(await val(() => location.search)).includes('mode'), await val(() => location.search));
+    await page.click('#flExit'); await page.waitForTimeout(200);
+    await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForTimeout(800);
+    check('so leaving survives a reload instead of being dragged back in',
+      (await val(() => document.querySelector('#follow').hidden)) === true);
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+  {
+    const { page, ctx } = await open({ query: '#follow', clock: '2026-10-13T11:45:00+08:00' });
+    check('#follow works too, for anything that eats query strings',
+      (await page.evaluate(() => !document.querySelector('#follow').hidden)));
+    await ctx.close();
+  }
+  {
+    const { page, ctx } = await open({ clock: '2026-10-13T11:45:00+08:00' });
+    await page.evaluate(() => { navigator.share = undefined;
+      window.__c = ''; navigator.clipboard.writeText = t => { window.__c = t; return Promise.resolve(); }; });
+    await page.click('#shareFollowBtn'); await page.waitForTimeout(300);
+    const copied = await page.evaluate(() => window.__c);
+    check('the leader can hand that link out in one tap', copied.endsWith('?mode=follow'), copied);
+    check('and is told it worked', (await page.evaluate(() =>
+      document.querySelector('#toast').textContent)).includes('已複製'));
     await ctx.close();
   }
   {
