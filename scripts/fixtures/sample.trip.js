@@ -49,8 +49,8 @@ window.TRIP = {
     ]}
   ],
   todos: [
-    { due: '出發前7天', title: '確認兩段航班時間', why: '班表仍可能調整', priority: '高', note: 'BR198 / BR197' },
-    { due: '出發前2天', title: '線上報到', why: '減少機場排隊', priority: '中', note: '' }
+    { id: 's1', due: '出發前7天', title: '確認兩段航班時間', why: '班表仍可能調整', priority: '高', note: 'BR198 / BR197' },
+    { id: 's2', due: '出發前2天', title: '線上報到', why: '減少機場排隊', priority: '中', note: '' }
   ],
   costs: [
     { name: 'BR198＋BR197 來回', cat: '機票', total: 34000, per: 17000 },

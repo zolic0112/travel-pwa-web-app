@@ -320,6 +320,70 @@ console.log('\n── every control does what it says ──');
   await ctx.close();
 }
 
+console.log('\n── to-do ticks belong to items, not to positions ──');
+{
+  /* Ticks were keyed by index, so inserting one to-do moved everybody's
+     saved ticks onto the wrong rows — silently. */
+  const { page, ctx, errs } = await open({
+    seed: `localStorage.setItem('my2026.todos', JSON.stringify({"0":true,"2":true,"5":true}))` });
+  const val = fn => page.evaluate(fn);
+  await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
+
+  check('old index-keyed ticks migrate to ids', (await val(() =>
+    Object.keys(JSON.parse(localStorage.getItem('my2026.todos'))).sort().join(','))) === 't1,t3,t6');
+  check('and land on the same three items', (await val(() =>
+    [...document.querySelectorAll('#todoList input')].map((c, i) => c.checked ? i : null)
+      .filter(x => x !== null).join(','))) === '0,2,5');
+
+  const was = await val(() => [...document.querySelectorAll('#todoList .todo')]
+    .filter(t => t.querySelector('input').checked).map(t => t.querySelector('h3').textContent).join('|'));
+  await val(() => { window.TRIP.todos.unshift({ id: 'tINS', due: '現在', title: '插進來的', why: 'x', priority: '中', note: '' }); renderTodos(); });
+  await page.waitForTimeout(250);
+  const now = await val(() => [...document.querySelectorAll('#todoList .todo')]
+    .filter(t => t.querySelector('input').checked).map(t => t.querySelector('h3').textContent).join('|'));
+  check('inserting a to-do does not move anyone’s ticks', now === was, `${was} → ${now}`);
+  check('no errors', !errs.length, errs[0] || '');
+  await ctx.close();
+}
+
+console.log('\n── my own to-dos are mine, and separate ──');
+{
+  const { page, ctx, errs } = await open();
+  const val = fn => page.evaluate(fn);
+  await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
+  await page.fill('#mineInput', '換錢');
+  await page.click('#mineForm button[type=submit]'); await page.waitForTimeout(300);
+  check('adding one works and clears the field',
+    (await val(() => document.querySelectorAll('#mineList .todo').length)) === 1
+    && (await val(() => document.querySelector('#mineInput').value)) === '');
+  await page.click('#mineForm button[type=submit]'); await page.waitForTimeout(250);
+  check('an empty title adds nothing', (await val(() => document.querySelectorAll('#mineList .todo').length)) === 1);
+  await page.click('#mineList .todo-hit'); await page.waitForTimeout(300);
+  check('ticking mine does not touch the trip’s progress',
+    (await val(() => document.querySelector('#todoPercent').textContent)) === '0%'
+    && (await val(() => document.querySelector('#mineCount').textContent)) === '1 / 1');
+  await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForTimeout(700);
+  await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
+  check('mine survive a reload', (await val(() => document.querySelectorAll('#mineList .todo').length)) === 1);
+  await page.click('#resetTodos'); await page.waitForTimeout(350);
+  check('resetting the shared list leaves mine alone',
+    (await val(() => document.querySelectorAll('#mineList .todo').length)) === 1);
+  await page.click('.del-mine'); await page.waitForTimeout(350);
+  check('deleting offers an undo', (await val(() => document.querySelectorAll('#mineList .todo').length)) === 0
+    && (await val(() => document.querySelector('#toastAction').textContent)) === '復原');
+  await page.click('#toastAction'); await page.waitForTimeout(350);
+  check('undo brings it back', (await val(() => document.querySelectorAll('#mineList .todo').length)) === 1);
+  check('no errors', !errs.length, errs[0] || '');
+  await ctx.close();
+}
+for (const [label, v] of [['an object', '{"a":1}'], ['nulls', '[null,{"id":"x"}]'], ['malformed JSON', '{{{']]) {
+  const { page, ctx, errs } = await open({ seed: `localStorage.setItem('my2026.todos.mine.v1', ${JSON.stringify(v)})` });
+  await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
+  check(`my list survives ${label} in storage`,
+    (await page.evaluate(() => !!document.querySelector('#todoList .todo'))) && !errs.length, errs[0] || '');
+  await ctx.close();
+}
+
 console.log('\n── it behaves like an app on a phone, not like a web page ──');
 {
   const { page, ctx, errs } = await open();

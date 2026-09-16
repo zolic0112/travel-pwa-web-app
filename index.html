@@ -125,6 +125,18 @@
         <button id="resetTodos" class="btn quiet">重設</button>
       </div>
       <div id="todoList" class="stack grouped"></div>
+
+      <div class="section-head sub-head">
+        <div><h2>我的</h2><p>只有這台裝置看得到，不會給同行的人。</p></div>
+        <span class="count num" id="mineCount"></span>
+      </div>
+      <form id="mineForm" class="mine-add">
+        <input id="mineInput" type="text" maxlength="40" placeholder="加一件自己的事，例如：換錢"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" />
+        <button class="btn primary" type="submit">加入</button>
+      </form>
+      <div id="mineList" class="stack grouped"></div>
+      <p id="mineEmpty" class="mine-empty" hidden>還沒有自己的項目。</p>
     </section>
 
     <section id="costs" class="view" role="tabpanel" aria-labelledby="tab-costs" tabindex="0">

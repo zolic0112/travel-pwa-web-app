@@ -89,8 +89,15 @@ const stones = days.flatMap(d => d.events.filter(e => e.milestone));
 if (!stones.length) bad('days', 'no event carries a milestone, so the countdown has nothing to count');
 
 /* ── todos, costs, sources ── */
+/* ticks are stored against these ids, so a duplicate or a renamed id moves
+   somebody's saved state onto the wrong row — the bug that keying by array
+   position used to cause on every insert. */
+const todoIds = new Set();
 (trip.todos || []).forEach((t, i) => {
-  for (const k of ['due','title','why','priority']) if (!isStr(t[k])) bad(`todos[${i}]`, `${k} is required`);
+  for (const k of ['id','due','title','why','priority']) if (!isStr(t[k])) bad(`todos[${i}]`, `${k} is required`);
+  if (t.id && !/^[A-Za-z0-9_-]+$/.test(t.id)) bad(`todos[${i}]`, `id "${t.id}" must be letters, digits, - or _`);
+  if (t.id && todoIds.has(t.id)) bad(`todos[${i}]`, `id "${t.id}" is used twice`);
+  todoIds.add(t.id);
 });
 if (!(trip.todos || []).length) bad('todos', 'empty, so the to-do ring would divide by zero');
 (trip.costs || []).forEach((c, i) => {

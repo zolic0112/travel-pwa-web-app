@@ -544,6 +544,32 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
 .empty-icon{width:40px;height:40px;border-radius:var(--r-md);background:var(--surface-2);display:grid;place-items:center;color:var(--muted);margin-bottom:5px}
 .empty-icon svg{width:20px;height:20px}
 .empty-state strong{color:var(--text);font-size:14.5px}
+
+/* ── my own to-dos ────────────────────────────────────────── */
+.section-head.sub-head{margin-top:30px;align-items:center}
+.section-head.sub-head h2{font-size:var(--t-h2)}
+.section-head .count{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.mine-add{display:flex;gap:8px;margin-bottom:10px}
+.mine-add input{
+  flex:1;min-width:0;border:1px solid var(--line);border-radius:var(--r-md);
+  padding:11px 13px;min-height:44px;
+  /* 16px or iOS zooms the page into it and never zooms back out */
+  font:inherit;font-size:16px;font-weight:400;color:var(--text);background:var(--surface);
+}
+.mine-add input:focus{border-color:var(--brand);outline:none;box-shadow:0 0 0 3px var(--brand-soft)}
+.mine-add input::placeholder{color:var(--muted)}
+/* the row's own padding moves onto the hit area, so the whole label is
+   tappable and the delete button sits outside it */
+.todo.mine{display:flex;align-items:center;gap:4px;padding:0 8px 0 0}
+.todo.mine .todo-hit{flex:1;min-width:0;display:flex;align-items:flex-start;gap:12px;
+  padding:13px 4px 13px 14px;cursor:pointer}
+.todo.mine .todo-body h3{font-size:var(--t-h3)}
+.todo.mine.done .todo-body h3{color:var(--muted);text-decoration:line-through}
+.mine-empty{font-size:12.5px;color:var(--muted);padding:2px 2px 0}
+/* one quiet × per row; a boxed button on every line reads as three
+   competing controls rather than one row with an affordance */
+.todo.mine .del-mine{border-color:transparent;background:transparent;color:var(--muted)}
+.todo.mine .del-mine:active{background:var(--sunken)}
 .empty-state>span{font-size:12.5px;max-width:34ch}
 
 .toast{
