@@ -225,7 +225,8 @@ svg{display:block}
 .route-strip{display:flex;align-items:center;gap:6px;margin-top:7px;font-size:11px;font-weight:600;color:var(--muted)}
 .route-strip span{letter-spacing:.06em}
 .route-strip i{width:14px;height:1px;background:var(--line);flex:none}
-.topbar-actions{display:flex;align-items:center;gap:9px;flex:none}
+@media (max-width:400px){.route-strip{gap:4px}.route-strip i{width:8px}}
+.topbar-actions{display:flex;align-items:center;gap:9px;flex:none;flex-wrap:wrap;justify-content:flex-end}
 .theme-switch{
   display:flex;gap:2px;padding:3px;background:var(--bar);
   border-radius:var(--r-md);border:1px solid var(--line-soft);
@@ -541,6 +542,7 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
 .plan-badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
 .badge{font-size:10px;font-weight:800;background:var(--surface-2);border:1px solid var(--line-soft);color:var(--text-2);padding:2px 7px;border-radius:var(--r-pill)}
 .plan-acts{display:flex;gap:8px}
+.topbar-tools{display:flex;align-items:center;gap:9px}
 .icon-btn{
   border:1px solid var(--line);background:var(--surface-2);color:var(--muted);
   border-radius:var(--r-sm);cursor:pointer;font-size:15px;line-height:1;transition:.15s;
@@ -729,6 +731,14 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
   padding:10px 16px calc(10px + env(safe-area-inset-bottom));flex:none}
 .fl-ground{font-size:11.5px;color:var(--muted);line-height:1.5;flex:1;min-width:0}
 .mode-btn{white-space:nowrap}
+.icon-btn{
+  min-width:44px;min-height:44px;display:grid;place-items:center;padding:0;cursor:pointer;
+  background:var(--bar);color:var(--muted);border:1px solid var(--line-soft);
+  border-radius:var(--r-md);transition:background .15s,color .15s;
+}
+.icon-btn svg{width:20px;height:20px;fill:currentColor}
+.icon-btn:focus-visible{color:var(--ink);background:var(--bar-active)}
+@media (hover:hover){.icon-btn:hover{color:var(--ink);background:var(--bar-active)}}
 @media (max-width:760px){.mode-btn{font-size:12px;padding:8px 11px}}
 
 .toast{

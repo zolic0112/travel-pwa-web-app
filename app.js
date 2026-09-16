@@ -55,6 +55,7 @@ const ICO = {
   sun:P("<path d='M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z'/>"),
   moon:P("<path d='M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z'/>"),
   plus:P("<path d='M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z'/>"),
+  share:P("<path d='M214.64,82.34l-56-56A8,8,0,0,0,144,32V64.65C88.42,68.53,48,111.62,48,168a8,8,0,0,0,14.63,4.46c13.1-19.65,35.21-32,58.53-34.94A88.24,88.24,0,0,1,144,136v32a8,8,0,0,0,13.66,5.66l56-56A8,8,0,0,0,214.64,82.34ZM160,148.69V128a8,8,0,0,0-8-8c-2,0-4.06,0-6.07.14a114.22,114.22,0,0,0-30.2,5.53,113.28,113.28,0,0,0-50.11,31.63C71,116.35,105.16,80,148,80a8,8,0,0,0,8-8V51.31L196.69,92Z'/>"),
   copy:P("<path d='M184,64H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H184a8,8,0,0,0,8-8V72A8,8,0,0,0,184,64Zm-8,144H48V80H176ZM224,40V184a8,8,0,0,1-16,0V48H72a8,8,0,0,1,0-16H216A8,8,0,0,1,224,40Z'/>"),
   check2:P("<path d='M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z'/>")
 };
@@ -588,11 +589,46 @@ function setMode(m){
   try{localStorage.setItem(MODE_KEY,m)}catch{}
   if(m==='follow'){ setFollowOpen(false); renderFollow(); scrollTo(0,0); }
 }
+/* A link decides the mode. Send ?mode=follow to the group and everyone who
+   opens it lands in the follower screen without being told which button to
+   press. The parameter is stripped afterwards so that leaving follower mode
+   survives a reload — otherwise the URL would drag them back in forever. */
+function modeFromURL(){
+  let m=null;
+  try{ m=new URL(location.href).searchParams.get('mode'); }catch{}
+  if(!m && location.hash==='#follow') m='follow';
+  if(m!=='follow' && m!=='lead') return null;
+  try{
+    const u=new URL(location.href);
+    u.searchParams.delete('mode');
+    if(u.hash==='#follow') u.hash='';
+    history.replaceState(null,'',u.pathname+u.search+u.hash);
+  }catch{}
+  return m;
+}
+function followLink(){
+  const u=new URL(location.href);
+  u.search=''; u.hash='';
+  u.searchParams.set('mode','follow');
+  return u.href;
+}
+async function shareFollow(){
+  const url=followLink();
+  const text=`${meta.shortTitle||meta.title}｜接下來要做什麼，這個連結會一直告訴你`;
+  if(navigator.share){
+    try{ await navigator.share({title:meta.title,text,url}); return; }
+    catch(e){ if(e&&e.name==='AbortError') return; }
+  }
+  try{ await navigator.clipboard.writeText(url); toast('連結已複製，貼到群組就好'); }
+  catch{ toast('長按網址列複製本頁網址，末尾加上 ?mode=follow'); }
+}
+
 function setupFollow(){
   let saved=null;
   try{saved=localStorage.getItem(MODE_KEY)}catch{}
-  setMode(saved==='follow'?'follow':'lead');
+  setMode(modeFromURL()||(saved==='follow'?'follow':'lead'));
   $('#modeBtn').onclick=()=>setMode(document.documentElement.dataset.mode==='follow'?'lead':'follow');
+  $('#shareFollowBtn').onclick=shareFollow;
   $('#flExit').onclick=()=>setMode('lead');
   $('#flMore').onclick=()=>setFollowOpen($('#flDetail').hidden);
 }
