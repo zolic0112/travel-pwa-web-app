@@ -30,6 +30,8 @@
   --on-ink:#EAF3F1;
   --on-ink-dim:#9DBAB6;
   --countdown:#F0B45C;
+  /* the one state where the card stops being calm: same family, hotter */
+  --hot:#3A130E; --hot-2:#5E1E15; --on-hot:#FFEFEC; --on-hot-dim:#D9A79E; --hot-lit:#FFB3A5;
   --node:#FFFFFF;
   --shadow-sm:0 1px 2px rgba(11,32,39,.06), 0 2px 6px rgba(11,32,39,.05);
   --shadow-md:0 2px 4px rgba(11,32,39,.05), 0 10px 26px rgba(11,32,39,.10);
@@ -80,6 +82,7 @@
     --on-ink:#EAF7F4;
     --on-ink-dim:#A8CCC5;
     --countdown:#FFC470;
+    --hot:#3E1410; --hot-2:#682218; --on-hot:#FFF0ED; --on-hot-dim:#E0AFA6; --hot-lit:#FFB3A5;
     --node:#19424D;
     --shadow-sm:0 1px 2px rgba(0,0,0,.40);
     --shadow-md:0 2px 4px rgba(0,0,0,.34), 0 12px 28px rgba(0,0,0,.46);
@@ -88,7 +91,7 @@
   }
 }
 :root[data-theme="dark"]{
-    --paper:#081A1F;
+  --paper:#081A1F;
   --surface:#102F38;
   --surface-2:#19424D;
   --sunken:#031014;
@@ -120,6 +123,7 @@
   --on-ink:#EAF7F4;
   --on-ink-dim:#A8CCC5;
   --countdown:#FFC470;
+  --hot:#3E1410; --hot-2:#682218; --on-hot:#FFF0ED; --on-hot-dim:#E0AFA6; --hot-lit:#FFB3A5;
   --node:#19424D;
   --shadow-sm:0 1px 2px rgba(0,0,0,.40);
   --shadow-md:0 2px 4px rgba(0,0,0,.34), 0 12px 28px rgba(0,0,0,.46);
@@ -128,6 +132,11 @@
 }
 
 *{box-sizing:border-box}
+/* The hidden attribute only carries `display:none` from the UA sheet, so any
+   rule of ours that sets display beats it and leaves the element on screen.
+   That has shipped three times now — the planner's empty state, both dialogs,
+   and the follower card's own sections — so it is settled here once. */
+[hidden]{display:none!important}
 /* ── native feel ──────────────────────────────────────────────
    Kill the interactions that read as "this is a web page": the grey tap
    flash, the long-press copy/share callout, text selection on chrome,
@@ -587,6 +596,140 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
    competing controls rather than one row with an affordance */
 .todo.mine .del-mine{border-color:transparent;background:transparent;color:var(--muted)}
 .todo.mine .del-mine:active{background:var(--sunken)}
+
+/* ── follower mode ────────────────────────────────────────────
+   One order, whole screen. The card is the app's own hero panel given
+   all the room, so it still reads as the same app. */
+:root[data-mode="follow"] .topbar,
+:root[data-mode="follow"] main,
+:root[data-mode="follow"] .tabs,
+:root[data-mode="follow"] footer,
+:root[data-mode="follow"] .fab,
+:root[data-mode="follow"] .critical-banner{display:none!important}
+
+/* no display rule here: that would beat the [hidden] attribute and leave
+   this layer over the app in leader mode */
+.follow{
+  position:fixed;inset:0;z-index:var(--z-banner);
+  background:var(--paper);
+  flex-direction:column;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+:root[data-mode="follow"] .follow:not([hidden]){display:flex}
+.fl-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:calc(13px + env(safe-area-inset-top)) 16px 9px;flex:none}
+.fl-trip{font-size:12.5px;font-weight:700;color:var(--text)}
+.fl-when{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.fl-dots{display:flex;gap:3px;padding:0 16px 9px;flex:none}
+.fl-dots i{height:3px;flex:1;border-radius:var(--r-pill);background:var(--line)}
+.fl-dots i.past{background:var(--muted);opacity:.55}
+.fl-dots i.here{background:var(--brand)}
+
+.fl-pad{flex:1;min-height:0;display:flex;padding:0 12px}
+.fl-card{
+  flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  border-radius:var(--r-xl);padding:18px 18px 16px;
+  background:linear-gradient(158deg,var(--ink-2) 0%,var(--ink) 74%);
+  color:var(--on-ink);box-shadow:var(--shadow-lg);
+  display:flex;flex-direction:column;gap:11px;justify-content:center;
+}
+.fl-card.open{justify-content:flex-start}
+.fl-card.hot{background:linear-gradient(158deg,var(--hot-2) 0%,var(--hot) 74%);color:var(--on-hot)}
+.fl-card.calm{background:var(--surface);color:var(--text);box-shadow:none;
+  border:1px dashed var(--line);justify-content:flex-start;padding-top:46px}
+
+.fl-head{display:flex;align-items:center;gap:11px}
+.fl-glyph{width:42px;height:42px;border-radius:13px;flex:none;
+  background:rgba(255,255,255,.12);display:grid;place-items:center;color:var(--on-ink)}
+.fl-card.hot .fl-glyph{background:rgba(255,255,255,.14);color:var(--on-hot)}
+.fl-card.calm .fl-glyph{background:var(--brand-soft);color:var(--brand)}
+.fl-glyph svg{width:21px;height:21px}
+.fl-kicker{font-size:12px;font-weight:700;color:var(--on-ink-dim)}
+.fl-card.hot .fl-kicker{color:var(--on-hot-dim)}
+.fl-card.calm .fl-kicker{color:var(--muted)}
+
+.fl-line{font-size:27px;font-weight:900;line-height:1.28;letter-spacing:-.01em;
+  text-wrap:balance;word-break:keep-all;line-break:strict}
+.fl-card.hot .fl-line,.fl-card:not(.calm) .fl-line{color:inherit}
+.fl-because{font-size:13px;line-height:1.6;color:var(--on-ink-dim)}
+.fl-card.hot .fl-because{color:var(--on-hot-dim)}
+.fl-card.calm .fl-because{color:var(--text-2)}
+
+.fl-route{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:var(--r-md);
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1)}
+.fl-port{display:flex;flex-direction:column;line-height:1.25}
+.fl-port b{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:.02em}
+.fl-port small{font-size:9.5px;color:var(--on-ink-dim)}
+.fl-card.hot .fl-port small{color:var(--on-hot-dim)}
+.fl-leg{flex:1;display:flex;align-items:center;gap:5px;color:var(--on-ink-dim)}
+.fl-card.hot .fl-leg{color:var(--on-hot-dim)}
+.fl-leg hr{flex:1;border:0;border-top:1px dashed currentColor;opacity:.5;margin:0}
+.fl-leg svg{width:13px;height:13px;flex:none}
+.fl-port.end{text-align:right}
+
+.fl-win{display:flex;flex-direction:column;gap:6px}
+.fl-count{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.fl-count b{font-size:40px;font-weight:600;letter-spacing:-.03em;line-height:1;
+  color:var(--countdown);font-variant-numeric:tabular-nums}
+.fl-card.hot .fl-count b{color:var(--hot-lit)}
+.fl-count span{font-size:12px;color:var(--on-ink-dim)}
+.fl-card.hot .fl-count span{color:var(--on-hot-dim)}
+
+.fl-scale{position:relative;height:40px;padding-inline:7px}
+.fl-rail{position:absolute;left:7px;right:7px;top:27px;height:4px;border-radius:var(--r-pill);
+  background:rgba(255,255,255,.16)}
+.fl-fill{position:absolute;left:7px;top:27px;height:4px;border-radius:var(--r-pill);
+  background:var(--countdown);opacity:.85}
+.fl-card.hot .fl-fill{background:var(--hot-lit)}
+/* the wall is labelled where it falls; parked at the edge it would name
+   the wrong time — most people think the flight is the deadline */
+.fl-wall{position:absolute;top:21px;width:2px;height:16px;border-radius:2px;
+  background:var(--countdown);transform:translateX(-50%)}
+.fl-card.hot .fl-wall{background:var(--hot-lit)}
+.fl-wall-tag{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;
+  display:flex;flex-direction:column;align-items:center;line-height:1.3;
+  font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--countdown)}
+.fl-wall-tag em{font-style:normal;font-family:var(--sans);font-size:9px;opacity:.9}
+.fl-card.hot .fl-wall-tag{color:var(--hot-lit)}
+.fl-now{position:absolute;top:22px;width:11px;height:11px;border-radius:50%;
+  background:#FFF;border:3px solid var(--ink);transform:translateX(-50%);
+  box-shadow:0 0 0 2px rgba(0,0,0,.2)}
+.fl-card.hot .fl-now{border-color:var(--hot)}
+.fl-ends{display:flex;justify-content:space-between;gap:10px;
+  font-family:var(--mono);font-size:10px;color:var(--on-ink-dim);font-variant-numeric:tabular-nums}
+.fl-card.hot .fl-ends{color:var(--on-hot-dim)}
+.fl-ends span{display:flex;flex-direction:column;gap:1px}
+.fl-ends span:last-child{text-align:right}
+.fl-ends em{font-style:normal;font-family:var(--sans);font-size:10px;opacity:.85}
+
+.fl-steps{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+.fl-steps b{font-size:11.5px;font-weight:800;padding:5px 10px;border-radius:var(--r-pill);
+  background:rgba(255,255,255,.13);white-space:nowrap}
+.fl-steps i{font-style:normal;font-size:11px;opacity:.6}
+
+.fl-more{font:inherit;font-size:13px;font-weight:700;cursor:pointer;
+  background:rgba(255,255,255,.14);color:var(--on-ink);
+  border:1px solid rgba(255,255,255,.18);border-radius:var(--r-pill);
+  padding:10px 16px;min-height:44px;align-self:flex-start;
+  display:inline-flex;align-items:center;gap:7px}
+.fl-card.hot .fl-more{color:var(--on-hot)}
+.fl-chev{font-size:11px;transition:transform .2s}
+.fl-card.open .fl-chev{transform:rotate(180deg)}
+
+.fl-detail{display:flex;flex-direction:column;gap:11px;
+  border-top:1px solid rgba(255,255,255,.14);padding-top:12px}
+.fl-detail div{display:flex;flex-direction:column;gap:3px}
+.fl-detail dt{font-size:11.5px;font-weight:700;color:var(--on-ink-dim)}
+.fl-card.hot .fl-detail dt{color:var(--on-hot-dim)}
+.fl-detail dd{font-size:13px;line-height:1.6}
+.fl-detail .last dd{color:var(--countdown);font-weight:600}
+.fl-card.hot .fl-detail .last dd{color:var(--hot-lit)}
+
+.fl-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));flex:none}
+.fl-ground{font-size:11.5px;color:var(--muted);line-height:1.5;flex:1;min-width:0}
+.mode-btn{white-space:nowrap}
+@media (max-width:760px){.mode-btn{font-size:12px;padding:8px 11px}}
 
 .toast{
   position:fixed;z-index:var(--z-toast);left:50%;transform:translateX(-50%) translateY(14px);

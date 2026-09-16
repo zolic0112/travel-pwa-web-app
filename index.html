@@ -44,6 +44,7 @@
       <div class="route-strip" id="tripRoute"></div>
     </div>
     <div class="topbar-actions">
+      <button id="modeBtn" class="btn quiet mode-btn" type="button">跟隊模式</button>
       <div class="theme-switch" role="radiogroup" aria-label="外觀主題">
         <button class="theme-opt" data-theme-set="light" role="radio" aria-checked="false" aria-label="淺色"><span class="theme-ico" data-icon="sun" aria-hidden="true"></span></button>
         <button class="theme-opt" data-theme-set="dark" role="radio" aria-checked="false" aria-label="深色"><span class="theme-ico" data-icon="moon" aria-hidden="true"></span></button>
@@ -164,6 +165,58 @@
       <div class="table-wrap"><table><thead><tr><th>項目</th><th>占比</th><th>含費總額</th><th>每人參考</th></tr></thead><tbody id="costTable"></tbody></table></div>
     </section>
   </main>
+
+  <!-- Follower mode: one order, nothing else. Not the same interface with
+       buttons greyed out — a smaller product that covers the whole screen. -->
+  <section id="follow" class="follow" hidden aria-label="跟隊模式">
+    <div class="fl-bar">
+      <span class="fl-trip" id="flTrip"></span>
+      <span class="fl-when num" id="flWhen"></span>
+    </div>
+    <div class="fl-dots" id="flDots" aria-hidden="true"></div>
+    <div class="fl-pad">
+      <article class="fl-card" id="flCard">
+        <div class="fl-head">
+          <span class="fl-glyph" id="flGlyph" aria-hidden="true"></span>
+          <p class="fl-kicker" id="flKicker"></p>
+        </div>
+        <h2 class="fl-line" id="flLine">載入中…</h2>
+        <p class="fl-because" id="flBecause"></p>
+        <div class="fl-route" id="flRoute" hidden>
+          <span class="fl-port"><b id="flFrom"></b><small id="flFromSub"></small></span>
+          <span class="fl-leg"><hr /><span id="flLegIcon"></span><hr /></span>
+          <span class="fl-port end"><b id="flTo"></b><small id="flToSub"></small></span>
+        </div>
+        <div class="fl-win" id="flWin" hidden>
+          <div class="fl-count"><b class="num" id="flCd"></b><span id="flCdu"></span></div>
+          <div class="fl-scale">
+            <i class="fl-rail"></i>
+            <i class="fl-fill" id="flFill"></i>
+            <i class="fl-wall" id="flWall" hidden></i>
+            <span class="fl-wall-tag" id="flWallTag" hidden><b class="num" id="flWallTime"></b><em id="flWallWhat"></em></span>
+            <i class="fl-now" id="flNow"></i>
+          </div>
+          <div class="fl-ends">
+            <span><b class="num" id="flL1"></b><em id="flL1t"></em></span>
+            <span><b class="num" id="flL2"></b><em id="flL2t"></em></span>
+          </div>
+        </div>
+        <div class="fl-steps" id="flSteps"></div>
+        <button class="fl-more" id="flMore" type="button" aria-expanded="false" aria-controls="flDetail">
+          <span id="flMoreLabel">還要注意什麼</span><span class="fl-chev" aria-hidden="true">▾</span>
+        </button>
+        <dl class="fl-detail" id="flDetail" hidden>
+          <div><dt>怎麼走</dt><dd id="flSteps2"></dd></div>
+          <div><dt>帶什麼</dt><dd id="flNeed"></dd></div>
+          <div class="last"><dt>萬一來不及</dt><dd id="flFallback"></dd></div>
+        </dl>
+      </article>
+    </div>
+    <div class="fl-foot">
+      <p class="fl-ground" id="flGround"></p>
+      <button class="btn quiet" id="flExit" type="button">看完整行程</button>
+    </div>
+  </section>
 
   <button id="addPlanFab" class="fab" data-icon="plus" aria-label="新增行程"></button>
   <div id="toast" class="toast" role="status" aria-live="polite">

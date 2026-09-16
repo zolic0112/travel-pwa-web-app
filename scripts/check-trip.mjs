@@ -74,6 +74,30 @@ days.forEach((d, i) => {
       for (const k of ['no','from','to','dep','arr']) if (!isStr(r[k])) bad(ev, `route.${k} is required`);
       for (const k of ['dep','arr']) if (r[k] && !/^\d{2}:\d{2}$/.test(r[k])) bad(ev, `route.${k} must be HH:MM`);
     }
+    if (e.brief) {
+      /* This is what a follower is told to do with their brain switched off,
+         so it is checked harder than anything else in the file. */
+      const br = e.brief, at = `${ev} brief`;
+      for (const k of ['line','because','need','fallback']) if (!isStr(br[k])) bad(at, `${k} is required`);
+      if (isStr(br.line) && [...br.line].length > 12) bad(at, `line is ${[...br.line].length} characters; 12 is the limit — Chinese has no spaces, so a longer one breaks mid-word`);
+      if (!Array.isArray(br.steps) || !br.steps.length || !br.steps.every(isStr)) bad(at, 'steps must be a non-empty array of strings');
+      else if (br.steps.length > 4) bad(at, `${br.steps.length} steps; 4 is the limit for one glance`);
+      const w = br.window || {};
+      for (const k of ['from','to']) {
+        if (!isStr(w[k]) || Number.isNaN(+new Date(w[k]))) { bad(at, `window.${k} is not a date`); continue; }
+        if (!/[+-]\d{2}:\d{2}$|Z$/.test(w[k])) bad(at, `window.${k} needs an explicit offset`);
+      }
+      for (const k of ['fromLabel','toLabel']) if (!isStr(w[k])) bad(at, `window.${k} is required`);
+      const t0 = +new Date(w.from), t1 = +new Date(w.to);
+      if (t0 && t1 && !(t0 < t1)) bad(at, 'window.from must come before window.to');
+      if (w.wall != null) {
+        const tw = +new Date(w.wall);
+        if (Number.isNaN(tw)) bad(at, 'window.wall is not a date');
+        else if (!(t0 <= tw && tw <= t1)) bad(at, 'window.wall falls outside from…to, so it would be drawn off the scale');
+        if (!isStr(w.wallLabel)) bad(at, 'window.wall needs a wallLabel');
+      }
+      if (!e.milestone) bad(at, 'only an event with a milestone can carry a brief — nothing would ever show it');
+    }
     if (e.milestone) {
       const ms = e.milestone;
       const t = new Date(ms.at);
