@@ -351,6 +351,26 @@ console.log('\n── my own to-dos are mine, and separate ──');
   const { page, ctx, errs } = await open();
   const val = fn => page.evaluate(fn);
   await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
+
+  check('the two lists are never on screen together', await val(() =>
+    getComputedStyle(document.querySelector('#paneShared')).display !== 'none'
+    && getComputedStyle(document.querySelector('#paneMine')).display === 'none'));
+
+  await page.click('#segMine'); await page.waitForTimeout(300);
+  /* stacked, this control sat 522px below the fold and read as broken */
+  const reach = await val(() => { const r = document.querySelector('#mineForm button').getBoundingClientRect();
+    return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight }; });
+  check('加入 is on screen without scrolling', reach.top > 0 && reach.bottom < reach.vh, JSON.stringify(reach));
+
+  const box = await page.locator('#mineInput').boundingBox();
+  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2); await page.waitForTimeout(250);
+  check('a real tap focuses the field', (await val(() => document.activeElement?.id)) === 'mineInput');
+  const btn = await page.locator('#mineForm button').boundingBox();
+  await page.touchscreen.tap(btn.x + btn.width / 2, btn.y + btn.height / 2); await page.waitForTimeout(400);
+  check('an empty submit says so instead of doing nothing',
+    (await val(() => document.querySelector('#toastText').textContent)) === '先輸入一個名稱'
+    && (await val(() => document.activeElement?.id)) === 'mineInput');
+
   await page.fill('#mineInput', '換錢');
   await page.click('#mineForm button[type=submit]'); await page.waitForTimeout(300);
   check('adding one works and clears the field',
@@ -361,11 +381,14 @@ console.log('\n── my own to-dos are mine, and separate ──');
   await page.click('#mineList .todo-hit'); await page.waitForTimeout(300);
   check('ticking mine does not touch the trip’s progress',
     (await val(() => document.querySelector('#todoPercent').textContent)) === '0%'
-    && (await val(() => document.querySelector('#mineCount').textContent)) === '1 / 1');
+    && (await val(() => document.querySelector('#mineCount').textContent)) === '1/1');
   await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForTimeout(700);
   await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
+  await page.click('#segMine'); await page.waitForTimeout(300);
   check('mine survive a reload', (await val(() => document.querySelectorAll('#mineList .todo').length)) === 1);
+  await page.click('#segShared'); await page.waitForTimeout(250);
   await page.click('#resetTodos'); await page.waitForTimeout(350);
+  await page.click('#segMine'); await page.waitForTimeout(300);
   check('resetting the shared list leaves mine alone',
     (await val(() => document.querySelectorAll('#mineList .todo').length)) === 1);
   await page.click('.del-mine'); await page.waitForTimeout(350);
@@ -379,6 +402,7 @@ console.log('\n── my own to-dos are mine, and separate ──');
 for (const [label, v] of [['an object', '{"a":1}'], ['nulls', '[null,{"id":"x"}]'], ['malformed JSON', '{{{']]) {
   const { page, ctx, errs } = await open({ seed: `localStorage.setItem('my2026.todos.mine.v1', ${JSON.stringify(v)})` });
   await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
+  await page.click('#segMine'); await page.waitForTimeout(250);
   check(`my list survives ${label} in storage`,
     (await page.evaluate(() => !!document.querySelector('#todoList .todo'))) && !errs.length, errs[0] || '');
   await ctx.close();
