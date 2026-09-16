@@ -455,26 +455,54 @@ function updateClock(){
 const MODE_KEY=ns('mode');
 const LEAD_MIN=45;   /* when a thing stops being "later" and becomes "soon" */
 
-function briefs(){
-  return trip.days.flatMap((d,day)=>d.events
-    .filter(e=>e.brief)
-    .map(e=>({e,day,from:+new Date(e.brief.window.from),to:+new Date(e.brief.window.to)})))
-    .sort((a,b)=>a.from-b.from);
+/* Follower mode has to answer "what now" for the whole trip, not only for
+   the moments somebody sat down and wrote an order for. An event with a
+   clock on it is already an answer; it just has not been phrased as one.
+   So an unwritten event is carried as a derived entry — the itinerary row
+   itself, shown with less confidence: no steps, no wall, nothing to
+   expand, because none of that was ever written. This is also what makes
+   a brand-new trip.js work in follower mode on the day it is created. */
+const HHMM=/(\d{1,2}):(\d{2})/g;
+const DERIVED_MIN=60;   /* how long an event with only a start time is given */
+function at(date,hh,mm){ return +new Date(`${date}T${String(hh).padStart(2,'0')}:${mm}:00${meta.tz}`); }
+function windowOf(e,date){
+  const m=[...String(e.time||'').matchAll(HHMM)];
+  if(!m.length) return null;                       /* 全天, 住宿: no clock, no order */
+  const from=at(date,m[0][1],m[0][2]);
+  let to=m[1]?at(date,m[1][1],m[1][2]):from+DERIVED_MIN*60000;
+  if(to<=from) to+=864e5;                          /* 22:05 → 00:30 is the next day */
+  return {from,to};
 }
-function todayISO(){
-  return new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'})
-    .format(new Date());
+function derive(e,date){
+  const w=windowOf(e,date);
+  if(!w) return null;
+  return {
+    line:e.title, because:(e.meta&&e.meta.length?e.meta.join('・'):e.note)||'',
+    steps:[], need:'', fallback:'',
+    window:{from:new Date(w.from).toISOString(),fromLabel:'開始',
+            to:new Date(w.to).toISOString(),toLabel:'結束'},
+  };
 }
+function entries(){
+  return trip.days.flatMap((d,day)=>d.events.map(e=>{
+    const brief=e.brief||derive(e,d.date);
+    if(!brief) return null;
+    return {e,day,brief,derived:!e.brief,
+      from:+new Date(brief.window.from),to:+new Date(brief.window.to)};
+  }).filter(Boolean)).sort((a,b)=>a.from-b.from);
+}
+const dayFmt=new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'});
+const dayOf=t=>dayFmt.format(new Date(t));
+function todayISO(){ return dayOf(Date.now()); }
 /* what the screen should be showing at this moment */
 function followState(now=Date.now()){
-  const all=briefs();
-  const item=all.find(x=>x.to>now);
+  const item=entries().find(x=>x.to>now);
   if(!item) return {kind:'done'};
-  const today=todayISO();
-  if(item.e.brief.window.from.slice(0,10)!==today) return {kind:'free',item};
+  if(dayOf(item.from)!==todayISO()) return {kind:'free',item};
   if(now<item.from-LEAD_MIN*60000) return {kind:'later',item};
   if(now<item.from) return {kind:'soon',item};
-  return {kind:item.e.level==='critical'?'tight':'go',item};
+  /* only a written order can claim the tight treatment */
+  return {kind:(!item.derived&&item.e.level==='critical')?'tight':'go',item};
 }
 /* a plain pair, not markup: the screen wants one number and one word */
 function span(ms){
@@ -514,7 +542,7 @@ function renderFollow(){
 
   /* today's other stops, so you know where you are in the day */
   const today=todayISO();
-  const mine=briefs().filter(x=>x.e.brief.window.from.slice(0,10)===today);
+  const mine=entries().filter(x=>dayOf(x.from)===today);
   const here=st.item?mine.indexOf(st.item):-1;
   $('#flDots').innerHTML=mine.length>1
     ? mine.map((_,i)=>`<i class="${i<here?'past':i===here?'here':''}"></i>`).join('') : '';
@@ -528,21 +556,22 @@ function renderFollow(){
     return;
   }
   if(st.kind==='free'){
-    const b=st.item.e.brief;
+    const b=st.item.brief;
     $('#flGlyph').innerHTML=icon('sun');
     $('#flKicker').textContent='今天';
     $('#flLine').textContent='沒有要趕的事';
     $('#flBecause').textContent=
-      `下一件是 ${st.item.e.brief.window.from.slice(5,10).replace('-','/')} ${clockAt(b.window.from)}：${b.line}。在那之前不用開這個。`;
+      `下一件是 ${dayOf(st.item.from).slice(5).replace('-','/')} ${clockAt(b.window.from)}：${b.line}。在那之前不用開這個。`;
     $('#flGround').textContent='';
     return;
   }
 
-  const {e}=st.item, b=e.brief, w=b.window;
+  const {e}=st.item, b=st.item.brief, w=b.window, plain=st.item.derived;
   const from=st.item.from, to=st.item.to, wall=w.wall?+new Date(w.wall):null;
   $('#flGlyph').innerHTML=typeIcon(e.type);
   $('#flKicker').textContent={later:'接下來',soon:'快到了',go:'現在',tight:'這段要抓緊'}[st.kind];
-  $('#flLine').textContent=st.kind==='soon'||st.kind==='later'?b.line:b.line;
+  $('#flLine').textContent=b.line;
+  card.classList.toggle('plain',plain);
   $('#flBecause').textContent=b.because;
 
   /* before it starts, the number is time until it starts; after, time left
@@ -574,6 +603,9 @@ function renderFollow(){
     $('#flTo').textContent=r.to;     $('#flToSub').textContent=r.toSub||'';
     $('#flLegIcon').innerHTML=r.kind==='air'?ICO.plane:ICO.train;
   }
+  /* nothing was written, so nothing is claimed */
+  $('#flSteps').hidden=plain; $('#flMore').hidden=plain;
+  if(plain) setFollowOpen(false);
   $('#flSteps').innerHTML=b.steps
     .map((x,i)=>`${i?'<i>→</i>':''}<b>${escapeHtml(x)}</b>`).join('');
   $('#flSteps2').textContent=b.steps.join(' → ');
