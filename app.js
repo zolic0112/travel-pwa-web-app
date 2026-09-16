@@ -150,37 +150,113 @@ function setDay(v){
   renderTimeline();renderPlans();
 }
 
-/* ── todos ────────────────────────────────────────────────── */
+/* ── to-dos ───────────────────────────────────────────────
+   Two lists, not one flag per item: the trip's own checklist, which
+   everyone sees the same, and whatever you add for yourself. Choosing
+   where a thing goes beats a share switch on every row. */
 const todoKey=ns('todos');
+const mineKey=ns('todos.mine.v1');
+
+/* Ticks used to be keyed by position in the array, so inserting or
+   reordering one to-do silently moved everybody's ticks onto the wrong
+   items. They are keyed by id now; this converts the old shape once. */
 function getTodoState(){
-  try{
-    const v=JSON.parse(localStorage.getItem(todoKey));
-    return v&&typeof v==='object'&&!Array.isArray(v)?v:{};
-  }catch{return {}}
+  let v=null;
+  try{ v=JSON.parse(localStorage.getItem(todoKey)); }catch{}
+  if(!v||typeof v!=='object'||Array.isArray(v)) return {};
+  const byIndex=Object.keys(v).every(k=>/^\d+$/.test(k));
+  if(!byIndex) return v;
+  const out={};
+  for(const k of Object.keys(v)){
+    const t=trip.todos[Number(k)];
+    if(t&&v[k]) out[t.id]=true;
+  }
+  saveTodoState(out);
+  return out;
 }
+function saveTodoState(s){
+  try{localStorage.setItem(todoKey,JSON.stringify(s));return true}
+  catch{toast('無法儲存勾選狀態');return false}
+}
+
+function getMine(){
+  try{
+    const v=JSON.parse(localStorage.getItem(mineKey));
+    if(!Array.isArray(v)) return [];
+    return v.filter(x=>x&&typeof x==='object'&&typeof x.id==='string'&&typeof x.title==='string')
+      .map(x=>({id:x.id,title:x.title,done:!!x.done}));
+  }catch{return []}
+}
+function saveMine(list){
+  try{localStorage.setItem(mineKey,JSON.stringify(list));}
+  catch{toast('無法儲存，裝置儲存空間已滿');return false}
+  renderTodos();return true;
+}
+
+function sharedRow(t,state,isNext){
+  return `<label class="todo ${state[t.id]?'done':''} ${isNext?'next-up':''}">
+    <input type="checkbox" data-id="${escapeHtml(t.id)}" ${state[t.id]?'checked':''}><span class="check"></span>
+    <div class="todo-body">
+      <div class="todo-top"><span class="due">${escapeHtml(t.due)}</span><span class="pri-chip ${t.priority==='高'?'high':''}">${escapeHtml(t.priority)}優先</span></div>
+      <h3>${escapeHtml(t.title)}</h3>
+      <p>${escapeHtml(t.why)}${t.note?` · ${escapeHtml(t.note)}`:''}</p>
+    </div></label>`;
+}
+function mineRow(m){
+  return `<div class="todo mine ${m.done?'done':''}">
+    <label class="todo-hit">
+      <input type="checkbox" data-mine="${escapeHtml(m.id)}" ${m.done?'checked':''}><span class="check"></span>
+      <div class="todo-body"><h3>${escapeHtml(m.title)}</h3></div>
+    </label>
+    <button class="icon-btn del-mine" data-id="${escapeHtml(m.id)}" type="button" aria-label="刪除「${escapeHtml(m.title)}」">×</button>
+  </div>`;
+}
+
 function renderTodos(){
   const state=getTodoState();
-  const nextIx=trip.todos.findIndex((_,i)=>!state[i]);
-  $('#todoList').innerHTML=trip.todos.map((t,i)=>`<label class="todo ${state[i]?'done':''} ${i===nextIx?'next-up':''}">
-    <input type="checkbox" data-i="${i}" ${state[i]?'checked':''}><span class="check"></span>
-    <div class="todo-body">
-      <div class="todo-top"><span class="due">${t.due}</span><span class="pri-chip ${t.priority==='高'?'high':''}">${t.priority}優先</span></div>
-      <h3>${t.title}</h3>
-      <p>${t.why}${t.note?` · ${t.note}`:''}</p>
-    </div></label>`).join('');
+  const next=trip.todos.find(t=>!state[t.id]);
+  $('#todoList').innerHTML=trip.todos.map(t=>sharedRow(t,state,t===next)).join('');
+
+  const mine=getMine();
+  $('#mineList').innerHTML=mine.map(mineRow).join('');
+  $('#mineEmpty').hidden=mine.length>0;
+  $('#mineCount').textContent=mine.length?`${mine.filter(m=>m.done).length} / ${mine.length}`:'';
+
   $$('#todoList input').forEach(cb=>cb.addEventListener('change',()=>{
-    const s=getTodoState();s[cb.dataset.i]=cb.checked;
-    try{localStorage.setItem(todoKey,JSON.stringify(s));}catch{toast('無法儲存勾選狀態');}
-    renderTodos();
+    const s=getTodoState();
+    if(cb.checked) s[cb.dataset.id]=true; else delete s[cb.dataset.id];
+    saveTodoState(s);renderTodos();
   }));
-  const done=trip.todos.filter((_,i)=>state[i]).length, total=trip.todos.length, pct=Math.round(done/total*100);
+  $$('#mineList input').forEach(cb=>cb.addEventListener('change',()=>{
+    saveMine(getMine().map(m=>m.id===cb.dataset.mine?{...m,done:cb.checked}:m));
+  }));
+  $$('.del-mine').forEach(b=>b.onclick=()=>{
+    const gone=getMine().find(m=>m.id===b.dataset.id);
+    if(!gone) return;
+    saveMine(getMine().filter(m=>m.id!==gone.id));
+    toast('已刪除',{label:'復原',fn(){saveMine([...getMine(),gone]);toast('已復原');}});
+  });
+
+  const done=trip.todos.filter(t=>state[t.id]).length, total=trip.todos.length,
+        pct=total?Math.round(done/total*100):0;
   $('#todoProgressText').textContent=`${done} / ${total} 完成`;
   $('#todoPercent').textContent=`${pct}%`;
   const C=2*Math.PI*31, ring=$('#todoRing');
   ring.style.strokeDashoffset=String(C*(1-pct/100));
   ring.style.opacity=pct?'1':'0';
-  const next=trip.todos.find((_,i)=>!state[i]);
   $('#todoNext').textContent=next?`下一項：${next.due} · ${next.title}`:'全部完成，出發前再複查一次即可';
+}
+
+function setupMine(){
+  const form=$('#mineForm'), input=$('#mineInput');
+  form.addEventListener('submit',e=>{
+    e.preventDefault();
+    const title=input.value.trim();
+    if(!title) return;
+    if(saveMine([...getMine(),{id:`m${Date.now()}`,title,done:false}])){
+      input.value='';toast('已加入');
+    }
+  });
 }
 
 /* ── costs ────────────────────────────────────────────────── */
@@ -573,6 +649,7 @@ function setupPWA(){
      the browser's own share-sheet action; the manifest is what makes it work. */
 }
 $('#resetTodos').addEventListener('click',()=>{
+  /* only the trip's own checklist; your own items are yours to delete */
   const before=getTodoState();
   if(!Object.values(before).some(Boolean)){toast('目前沒有勾選項目');return;}
   try{localStorage.removeItem(todoKey)}catch{}
@@ -596,6 +673,7 @@ renderTodos();
 renderCosts();
 setupPlanner();
 setupSources();
+setupMine();
 setupBanner();
 setupPWA();
 setupNextJump();

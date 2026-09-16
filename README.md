@@ -19,8 +19,9 @@
 1. 複製 `trip.js`，改 `meta.id`。這個 id 是 localStorage 的命名空間，換了 id 新旅行就有自己的勾選、自訂行程與主題，不會沿用上一趟的。
 2. 換掉 `meta`、`days`、`todos`、`costs`、`sources`。`meta.currency`、`meta.party`、`meta.tz` / `meta.timeZone` 都會被畫面沿用，不必另外改程式。
 3. 需要倒數的事件，直接在那筆 event 上掛 `milestone`。倒數清單是從事件推導出來的，所以不可能指到一筆已經被改掉或刪掉的列。
-4. 同步 `manifest.webmanifest` 的 `name` / `short_name` / `description`。
-5. 跑 `node scripts/check-trip.mjs`。
+4. 每則 `todos` 都要有唯一的 `id`。**勾選狀態是存在這個 id 上的**，所以 id 一旦發出去就不要再改；順序可以隨便調、中間可以插件新的，別人的勾選不會跑掉。
+5. 同步 `manifest.webmanifest` 的 `name` / `short_name` / `description`。
+6. 跑 `node scripts/check-trip.mjs`。
 
 `scripts/fixtures/sample.trip.js` 是一份完全不同的旅行（東京、日圓、2 人、UTC+9），存在的理由是證明 app 沒有偷藏任何一趟旅行的知識；smoke 測試會用它整個跑一次。
 
@@ -52,4 +53,7 @@ python3 -m http.server 8080   # http://localhost:8080
 
 ## 資料儲存
 
-待辦勾選與自訂行程只存在目前瀏覽器／裝置，沒有後端，也不會多人同步。
+待辦勾選、「我的」待辦與自訂行程都只存在目前瀏覽器／裝置，沒有後端，也不會多人同步。
+
+共同的東西（固定行程、出發前待辦、費用）放 `trip.js`，跟著部署走，所有人打開都一樣；
+個人的東西（勾選進度、我的待辦、自訂行程）留在 localStorage。**用「放哪裡」區分，不是用每項一個開關。**
