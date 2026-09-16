@@ -528,6 +528,41 @@ console.log('\n── follower mode shows one order and nothing else ──');
     check('after the trip it is finished', (await read(page)).line === '旅程完成');
     await ctx.close();
   }
+  /* an event with a clock on it is already an answer to "what now" — the
+     screen must not go blank between the nine written orders */
+  for (const [clock, want] of [
+    ['2026-10-08T17:30:00+08:00', 'KUL 入境、領行李 → Hotel Royal Signature'],
+    ['2026-10-10T12:10:00+08:00', 'Hotel Royal Signature 退房／寄放行李'],
+    ['2026-10-13T20:40:00+08:00', 'TPE T2 入境／領行李 → A13 → A18'],
+  ]) {
+    const { page, ctx, errs } = await open({ query: '?mode=follow', clock });
+    const r = await read(page);
+    check(`${clock.slice(5, 16)} answers from the itinerary instead of going quiet`,
+      r.line === want && !r.calm, `${r.line}${r.calm ? ' (calm)' : ''}`);
+    /* nothing was written, so nothing is claimed: no steps, nothing to open */
+    check('and it claims no more than the row says', await page.evaluate(() =>
+      document.querySelector('#flSteps').hidden && document.querySelector('#flMore').hidden
+      && document.querySelector('#flCard').classList.contains('plain')));
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+  {
+    const { page, ctx } = await open({ query: '?mode=follow', clock: '2026-10-09T10:00:00+08:00' });
+    check('a free day points at the real next thing, not the next written one',
+      (await page.evaluate(() => document.querySelector('#flBecause').textContent)).includes('10/10 12:00'),
+      await page.evaluate(() => document.querySelector('#flBecause').textContent));
+    await ctx.close();
+  }
+  /* the productisation test: a trip.js with no briefs at all still answers */
+  {
+    const { page, ctx, errs } = await open({ trip: path.join(HERE, 'fixtures/sample.trip.js'),
+      query: '?mode=follow', clock: '2027-03-05T10:00:00+09:00' });
+    const r = await read(page);
+    check('a trip that has never been briefed still works in follower mode',
+      r.line === '台北 TPE → 東京 NRT' && !r.calm, r.line);
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
   /* the link is the product: four people open it and are in follower mode
      without being told which button to press */
   {

@@ -1,4 +1,4 @@
-const VERSION = 'v6';
+const VERSION = 'v7';
 const SHELL = `shell-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
 const SHELL_URLS = ['./', './index.html', './trip.js', './styles.css', './app.js', './manifest.webmanifest'];

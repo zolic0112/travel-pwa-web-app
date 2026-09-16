@@ -653,6 +653,9 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
 .fl-line{font-size:27px;font-weight:900;line-height:1.28;letter-spacing:-.01em;
   text-wrap:balance;word-break:keep-all;line-break:strict}
 .fl-card.hot .fl-line,.fl-card:not(.calm) .fl-line{color:inherit}
+/* a derived line is the itinerary row, not a twelve-character order:
+   it gets room to be long instead of being cut to fit */
+.fl-card.plain .fl-line{font-size:21px;line-height:1.35}
 .fl-because{font-size:13px;line-height:1.6;color:var(--on-ink-dim)}
 .fl-card.hot .fl-because{color:var(--on-hot-dim)}
 .fl-card.calm .fl-because{color:var(--text-2)}
