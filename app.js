@@ -762,10 +762,15 @@ function peek(key){
    decides whether the expensive version is worth building: is what comes
    back actually good enough to hand somebody in an airport? */
 
+/* Every step is a chip you read at a glance in a row of chips. The longest
+   one anybody has hand-written is 9 characters (「A13 → A18」), so the limit
+   is 10 — and the prompt, this gate and check-trip.mjs all say 10, because a
+   rule the prompt asks for and the code does not enforce is not a rule. */
+const STEP_MAX=10;
 function briefRules(){
   return [
     '一句話（line）不超過 12 個字。這是口令，不是說明。超過 12 字就是失敗。',
-    '步驟（steps）最多 4 步，每步最多 8 個字，是動作不是描述。做不到 4 步以內就給比較少步。',
+    `步驟（steps）最多 4 步，每步最多 ${STEP_MAX} 個字，是動作不是描述。做不到 4 步以內就給比較少步。`,
     '為什麼（because）一到兩句，講這段為什麼重要、什麼會出錯。',
     '帶什麼（need）只寫這一段真的會用到的東西。沒有就留空字串。',
     '萬一來不及（fallback）寫具體的下一步動作。不知道就留空字串，不要編。',
@@ -819,6 +824,8 @@ function checkDraft(k,v){
   else if([...line].length>12) bad.push(`${k}：一句話 ${[...line].length} 字，超過 12（「${line}」）`);
   const steps=Array.isArray(v.steps)?v.steps.filter(x=>typeof x==='string'&&x.trim()):[];
   if(steps.length>4) bad.push(`${k}：${steps.length} 個步驟，超過 4`);
+  for(const st of steps) if([...st.trim()].length>STEP_MAX)
+    bad.push(`${k}：步驟「${st.trim()}」${[...st.trim()].length} 字，超過 ${STEP_MAX}`);
   return bad;
 }
 function parseDraft(text,keys){
@@ -843,18 +850,49 @@ function parseDraft(text,keys){
   return {out,bad,unknown};
 }
 
-let draftKeys=[];
+let draftKeys=[], beforeApply=null;
+function undoApply(){
+  if(!beforeApply) return;
+  if(!saveBriefs(beforeApply)) return;
+  beforeApply=null;
+  renderTimeline(); renderFollow(); refreshDraftButtons();
+  $('#dfUndo').hidden=true;
+  $('#dfResult').textContent='已復原，回到套用之前的狀態。';
+  toast('已復原');
+}
+function refreshDraftButtons(){
+  const n=Object.values(getBriefs()).filter(v=>v.by==='ai').length;
+  $('#dfClearAi').hidden=!n;
+  $('#dfClearAi').textContent=`清除 ${n} 筆 AI 起草`;
+}
 function openDraft(keys){
-  draftKeys=keys;
+  draftKeys=keys; beforeApply=null;
   const n=keys.length;
   $('#dfFor').textContent=n===1
     ? entries().filter(x=>rowKey(x.e,x.day)===keys[0]).map(x=>`${trip.days[x.day].label} ${x.e.time}　${x.e.title}`)[0]||''
     : `${n} 個還沒有人寫過內容的項目`;
   $('#dfPaste').value=''; $('#dfResult').hidden=true; $('#dfResult').textContent='';
+  $('#dfUndo').hidden=true;
+  refreshDraftButtons();
   $('#draftDialog').showModal();
 }
 function setupDraft(){
   $('#closeDraft').onclick=()=>$('#draftDialog').close();
+  $('#dfUndo').onclick=undoApply;
+  /* undo only reaches back to this session's apply; this is the way out for
+     drafts applied at some point in the past */
+  $('#dfClearAi').onclick=()=>{
+    const before=getBriefs(), after={};
+    for(const [k,v] of Object.entries(before)) if(v.by!=='ai') after[k]=v;
+    const n=Object.keys(before).length-Object.keys(after).length;
+    if(!saveBriefs(after)) return;
+    renderTimeline(); renderFollow(); refreshDraftButtons();
+    $('#dfResult').hidden=false;
+    $('#dfResult').textContent=`已清除 ${n} 筆沒有人檢查過的 AI 起草，回到行程原本的內容。`;
+    toast(`已清除 ${n} 筆`,{label:'復原',fn(){
+      if(saveBriefs(before)){renderTimeline();renderFollow();refreshDraftButtons();toast('已復原');}
+    }});
+  };
   $('#dfCopy').onclick=async()=>{
     const text=draftPrompt(draftKeys);
     try{ await navigator.clipboard.writeText(text); toast('已複製，貼給 Claude'); }
@@ -875,13 +913,15 @@ function setupDraft(){
     const missing=draftKeys.filter(k=>!got.includes(k));
     if(missing.length) notes.push(`還有 ${missing.length} 個項目沒有內容。`);
     if(!got.length){ box.textContent=['一個都沒有套用。',...notes].join('\n\n'); return; }
+    const snapshot=getBriefs();
     const all=getBriefs();
     for(const k of got) all[k]={...r.out[k],by:'ai'};
     if(!saveBriefs(all)) return;
-    renderTimeline(); renderFollow();
+    beforeApply=snapshot; $('#dfUndo').hidden=false;
+    renderTimeline(); renderFollow(); refreshDraftButtons();
+    toast(`已套用 ${got.length} 個`,{label:'復原',fn:undoApply});
     box.textContent=[`已套用 ${got.length} 個，全部標記成「AI 起草」。`,
       '這些內容沒有人檢查過。請逐一打開確認，改過之後標記就會消失。',...notes].join('\n\n');
-    toast(`已套用 ${got.length} 個`);
   };
 }
 
@@ -922,6 +962,8 @@ function setupBriefEditor(){
     if([...line].length>12){ $('#bfLine').focus(); toast('一句話請控制在 12 個字以內'); return; }
     const steps=$('#bfSteps').value.split('\n').map(x=>x.trim()).filter(Boolean);
     if(steps.length>4){ $('#bfSteps').focus(); toast('步驟最多四步，記不住更多'); return; }
+    const longStep=steps.find(x=>[...x].length>STEP_MAX);
+    if(longStep){ $('#bfSteps').focus(); toast(`「${longStep}」太長了，每步最多 ${STEP_MAX} 字`); return; }
     const all=getBriefs();
     /* a person has now read every field of this, so it is theirs */
     const next={line,because:$('#bfBecause').value.trim(),steps,
@@ -951,8 +993,15 @@ function setupFollow(){
   setupBriefEditor();
   setupDraft();
   $('#draftAllBtn').onclick=()=>{
-    const todo=entries().filter(x=>x.derived).map(x=>rowKey(x.e,x.day));
-    if(!todo.length){ toast('每個項目都已經有內容了'); return; }
+    /* a row still flagged as an unchecked AI draft counts as unwritten —
+       otherwise the first apply locks the button and there is no way to
+       try a different draft without clearing five rows by hand */
+    const mine=getBriefs();
+    const todo=entries().filter(x=>{
+      const own=mine[rowKey(x.e,x.day)];
+      return x.derived||(own&&own.by==='ai');
+    }).map(x=>rowKey(x.e,x.day));
+    if(!todo.length){ toast('每個項目都有人寫過或檢查過了'); return; }
     openDraft(todo);
   };
   $('#bfDraft').onclick=()=>{ $('#briefDialog').close(); openDraft([editingKey]); };
