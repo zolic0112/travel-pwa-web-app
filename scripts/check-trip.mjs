@@ -82,6 +82,10 @@ days.forEach((d, i) => {
       if (isStr(br.line) && [...br.line].length > 12) bad(at, `line is ${[...br.line].length} characters; 12 is the limit — Chinese has no spaces, so a longer one breaks mid-word`);
       if (!Array.isArray(br.steps) || !br.steps.length || !br.steps.every(isStr)) bad(at, 'steps must be a non-empty array of strings');
       else if (br.steps.length > 4) bad(at, `${br.steps.length} steps; 4 is the limit for one glance`);
+      /* Same number the drafting prompt asks for and the editor enforces —
+         a limit only one of the three honours is not a limit. */
+      else for (const st of br.steps) if ([...st].length > 10)
+        bad(at, `step ${JSON.stringify(st)} is ${[...st].length} chars; 10 is the limit`);
       const w = br.window || {};
       for (const k of ['from','to']) {
         if (!isStr(w[k]) || Number.isNaN(+new Date(w[k]))) { bad(at, `window.${k} is not a date`); continue; }

@@ -709,6 +709,16 @@ console.log('\n── follower mode shows one order and nothing else ──');
     check('a key it invented is skipped', said.includes('不認得的項目 1 個'));
     check('and nothing at all was stored', (await val(() => localStorage.getItem('my2026.briefs.v1'))) === null);
 
+    /* the prompt asks for ten characters a step, so the gate has to mean it */
+    await page.fill('#dfPaste', JSON.stringify({
+      [KUL]: { line: '入境後去飯店', because: 'x', steps: ['入境之後先去領行李再排隊'], need: '', fallback: '' },
+    }));
+    await page.click('#dfApply'); await page.waitForTimeout(400);
+    check('a step longer than the prompt asked for is refused too',
+      (await val(() => document.querySelector('#dfResult').textContent)).includes('12 字，超過 10')
+      && (await val(() => localStorage.getItem('my2026.briefs.v1'))) === null,
+      (await val(() => document.querySelector('#dfResult').textContent)).slice(0, 90));
+
     await page.fill('#dfPaste', JSON.stringify({
       [KUL]: { line: '入境後去飯店', because: '排隊加領行李要抓 1.5–2.5 小時。', steps: ['入境','領行李','去飯店'], need: '', fallback: '' },
     }));
@@ -733,6 +743,53 @@ console.log('\n── follower mode shows one order and nothing else ──');
       (await val(() => document.querySelectorAll('.ai-flag').length)) === 0
       && (await val(() => JSON.parse(localStorage.getItem('my2026.briefs.v1'))[
         '0|16:10–約19:00|KUL 入境、領行李 → Hotel Royal Signature'].by)) === 'me');
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+  /* applying is a bulk write, so it has to come back in one move — and
+     drafting again has to stay possible, or one apply ends the experiment */
+  {
+    const { page, ctx, errs } = await open({ clock: '2026-09-17T14:00:00+08:00' });
+    const val = fn => page.evaluate(fn);
+    const KUL = '0|16:10–約19:00|KUL 入境、領行李 → Hotel Royal Signature';
+    const CHECKOUT = '2|12:00|Hotel Royal Signature 退房／寄放行李';
+    const draft = JSON.stringify({
+      [KUL]: { line: '入境後去飯店', because: 'a', steps: ['入境'], need: '', fallback: '' },
+      [CHECKOUT]: { line: '退房寄行李', because: 'b', steps: ['退房'], need: '', fallback: '' },
+    });
+    await page.click('#draftAllBtn'); await page.waitForTimeout(300);
+    await page.fill('#dfPaste', draft);
+    await page.click('#dfApply'); await page.waitForTimeout(400);
+    check('after applying, undo is offered', await val(() => !document.querySelector('#dfUndo').hidden));
+    await page.click('#dfUndo'); await page.waitForTimeout(400);
+    check('and it puts everything back in one move',
+      (await val(() => localStorage.getItem('my2026.briefs.v1'))) === '{}'
+      && (await val(() => document.querySelectorAll('.ai-flag').length)) === 0);
+
+    await page.fill('#dfPaste', draft);
+    await page.click('#dfApply'); await page.waitForTimeout(400);
+    await page.click('#closeDraft'); await page.waitForTimeout(250);
+    await page.click('#draftAllBtn'); await page.waitForTimeout(350);
+    check('an unchecked draft still counts as unwritten, so it can be redrafted',
+      (await val(() => document.querySelector('#dfFor').textContent)).startsWith('5 個'),
+      await val(() => document.querySelector('#dfFor').textContent));
+
+    /* clearing is the way back for drafts applied in an earlier session, and
+       it must not touch anything a person has already read */
+    await page.evaluate(k => {
+      const all = JSON.parse(localStorage.getItem('my2026.briefs.v1'));
+      all[k] = { ...all[k], line: '我改過的', by: 'me' };
+      localStorage.setItem('my2026.briefs.v1', JSON.stringify(all));
+    }, CHECKOUT);
+    await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForTimeout(800);
+    await page.click('#draftAllBtn'); await page.waitForTimeout(350);
+    check('the clear button counts only the unchecked ones',
+      (await val(() => document.querySelector('#dfClearAi').textContent)).includes('1 筆'),
+      await val(() => document.querySelector('#dfClearAi').textContent));
+    await page.click('#dfClearAi'); await page.waitForTimeout(450);
+    const left = JSON.parse(await val(() => localStorage.getItem('my2026.briefs.v1')));
+    check('clearing keeps what a person checked and drops what they did not',
+      Object.keys(left).length === 1 && left[CHECKOUT].line === '我改過的', JSON.stringify(Object.keys(left)));
     check('no errors', !errs.length, errs[0] || '');
     await ctx.close();
   }

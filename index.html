@@ -306,7 +306,11 @@
         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea></label>
       <pre class="draft-result full" id="dfResult" hidden></pre>
     </div>
-    <div class="dialog-actions"><button type="button" class="btn primary" id="dfApply">套用</button></div>
+    <div class="dialog-actions">
+      <button type="button" class="btn quiet danger" id="dfClearAi" hidden></button>
+      <button type="button" class="btn quiet danger" id="dfUndo" hidden>復原這次套用</button>
+      <button type="button" class="btn primary" id="dfApply">套用</button>
+    </div>
   </dialog>
 
   <dialog id="sourceDialog">
