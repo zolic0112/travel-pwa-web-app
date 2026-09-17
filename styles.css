@@ -656,6 +656,18 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
 /* a derived line is the itinerary row, not a twelve-character order:
    it gets room to be long instead of being cut to fit */
 .fl-card.plain .fl-line{font-size:21px;line-height:1.35}
+/* every row offers the follower view of itself, so nobody has to type a URL
+   to see what they will be told when they are standing there */
+.peek{
+  margin-top:11px;display:inline-flex;align-items:center;gap:7px;
+  min-height:44px;padding:0 14px;cursor:pointer;
+  background:transparent;color:var(--muted);border:1px dashed var(--line);
+  border-radius:var(--r-pill);font:inherit;font-size:12.5px;font-weight:700;
+  transition:background .15s,color .15s;
+}
+.peek svg{width:15px;height:15px;fill:currentColor}
+.peek:focus-visible{color:var(--brand-deep);background:var(--brand-soft)}
+@media (hover:hover){.peek:hover{color:var(--brand-deep);background:var(--brand-soft)}}
 .fl-preview{
   margin:0 16px 8px;padding:7px 12px;border-radius:var(--r-sm);
   background:var(--sunken);color:var(--countdown);border:1px solid var(--line);
