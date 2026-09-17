@@ -659,6 +659,18 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
 /* every row offers the follower view of itself, so nobody has to type a URL
    to see what they will be told when they are standing there */
 .row-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
+.ai-flag{
+  margin-top:10px;font-size:11.5px;font-weight:800;color:var(--countdown);
+  display:flex;align-items:center;gap:6px;
+}
+.ai-flag::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.steps-list{margin:0;padding-left:20px;display:grid;gap:7px;font-size:12.5px;color:var(--text-2);line-height:1.55;font-weight:500}
+.steps-list b{color:var(--text);font-weight:800}
+.draft-result{
+  margin:0;padding:11px;border-radius:var(--r-sm);background:var(--sunken);
+  border:1px solid var(--line-soft);font-size:12px;line-height:1.6;color:var(--text-2);
+  white-space:pre-wrap;word-break:break-word;font-family:inherit;max-height:220px;overflow:auto;
+}
 .peek{
   display:inline-flex;align-items:center;gap:7px;
   min-height:44px;padding:0 14px;cursor:pointer;

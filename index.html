@@ -93,6 +93,7 @@
 
       <div class="section-head">
         <div><h2>固定時間軸</h2><p id="timelineNote"></p></div>
+        <button class="btn quiet" type="button" id="draftAllBtn">用 AI 起草</button>
       </div>
       <div class="day-strip" id="dayStrip" role="group" aria-label="篩選日期"></div>
       <div id="timeline" class="timeline"></div>
@@ -280,11 +281,32 @@
           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"></textarea></label>
       </div>
       <div class="dialog-actions">
+        <button type="button" class="btn quiet" id="bfDraft">用 AI 起草</button>
         <button type="button" class="btn quiet danger" id="bfClear" hidden>清除</button>
         <button type="button" class="btn quiet" id="cancelBrief">取消</button>
         <button class="btn primary" value="default">儲存</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Step one of A: the app writes the prompt, a person carries it to
+       Claude, the JSON comes back through the same validator the editor
+       uses. No key in this page, nothing sent anywhere. -->
+  <dialog id="draftDialog">
+    <div class="dialog-head"><h2>用 AI 起草跟隊內容</h2><button type="button" id="closeDraft" aria-label="關閉">×</button></div>
+    <p class="dialog-hint" id="dfFor"></p>
+    <div class="form-grid">
+      <ol class="steps-list full">
+        <li>按「複製 prompt」，貼給 Claude（或任何你在用的 AI）。</li>
+        <li>把它回的 JSON 整段貼到下面，按「套用」。</li>
+        <li>套用進來的內容會標成「AI 起草」。<b>請逐一打開確認</b> —— 這些字是要給人在機場照著做的。</li>
+      </ol>
+      <div class="full"><button type="button" class="btn primary" id="dfCopy">複製 prompt</button></div>
+      <label class="full">把 AI 回的 JSON 貼在這裡<textarea id="dfPaste" rows="6"
+        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea></label>
+      <pre class="draft-result full" id="dfResult" hidden></pre>
+    </div>
+    <div class="dialog-actions"><button type="button" class="btn primary" id="dfApply">套用</button></div>
   </dialog>
 
   <dialog id="sourceDialog">
