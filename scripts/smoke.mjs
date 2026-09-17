@@ -563,6 +563,44 @@ console.log('\n── follower mode shows one order and nothing else ──');
     check('no errors', !errs.length, errs[0] || '');
     await ctx.close();
   }
+  /* a quiet screen and a broken screen look the same — three weeks out it
+     has to say which one it is */
+  {
+    const { page, ctx, errs } = await open({ query: '?mode=follow', clock: '2026-09-17T14:00:00+08:00' });
+    const r = await read(page);
+    check('before the trip it counts the days instead of saying nothing is on',
+      r.kicker === '出發前' && r.line === '還有 21 天', `${r.kicker} / ${r.line}`);
+    check('and names what starts it', (await page.evaluate(() =>
+      document.querySelector('#flBecause').textContent)).includes('10/08 06:40'));
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+  {
+    const { page, ctx } = await open({ query: '?mode=follow', clock: '2026-10-11T10:20:00+08:00' });
+    check('a free day in the middle of the trip is still a free day, not a countdown',
+      (await read(page)).line === '沒有要趕的事');
+    await ctx.close();
+  }
+  /* ?at= is how anybody checks a moment that has not arrived yet */
+  {
+    const { page, ctx, errs } = await open({ query: '?at=2026-10-13T11:45', clock: '2026-09-17T14:00:00+08:00' });
+    const r = await read(page);
+    check('a preview time shows that moment, without being in it', r.hot && r.cd === '2:45', `${r.cd}`);
+    check('and it is in follower mode without being asked', await page.evaluate(() =>
+      document.documentElement.dataset.mode === 'follow'));
+    check('and the screen says it is a preview', await page.evaluate(() =>
+      !document.querySelector('#flPreview').hidden));
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+  {
+    const { page, ctx, errs } = await open({ query: '?at=garbage', clock: '2026-09-17T14:00:00+08:00' });
+    check('an unparseable preview time is ignored rather than obeyed', await page.evaluate(() =>
+      document.documentElement.dataset.mode !== 'follow'
+      && document.querySelector('#flPreview').hidden));
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
   /* the link is the product: four people open it and are in follower mode
      without being told which button to press */
   {
