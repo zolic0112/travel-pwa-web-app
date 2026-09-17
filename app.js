@@ -493,14 +493,35 @@ function entries(){
 }
 const dayFmt=new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'});
 const dayOf=t=>dayFmt.format(new Date(t));
-function todayISO(){ return dayOf(Date.now()); }
+function todayISO(){ return dayOf(now()); }
+
+/* Three weeks before departure the screen is quiet, correctly — and a quiet
+   screen is indistinguishable from a broken one. ?at=2026-10-08T17:30 moves
+   the follower clock so any moment can be looked at before the trip, by
+   whoever is checking it as much as by whoever built it. It stays in the URL
+   and says so on screen, because a preview that looks like the real thing is
+   worse than no preview. */
+let previewAt=null;
+function readPreview(){
+  let v=null;
+  try{ v=new URL(location.href).searchParams.get('at'); }catch{}
+  if(!v) return;
+  const t=Date.parse(/[zZ+]|\d[+-]\d\d:?\d\d$/.test(v)?v:v+meta.tz);
+  if(!Number.isNaN(t)) previewAt=t;
+}
+function now(){ return previewAt??Date.now(); }
 /* what the screen should be showing at this moment */
-function followState(now=Date.now()){
-  const item=entries().find(x=>x.to>now);
+function followState(t=now()){
+  const all=entries();
+  const item=all.find(x=>x.to>t);
   if(!item) return {kind:'done'};
-  if(dayOf(item.from)!==todayISO()) return {kind:'free',item};
-  if(now<item.from-LEAD_MIN*60000) return {kind:'later',item};
-  if(now<item.from) return {kind:'soon',item};
+  const today=todayISO();
+  /* before the trip, say so with the number of days — not "沒有要趕的事",
+     which is what this also says on a free day in the middle of it */
+  if(all[0]&&t<all[0].from&&dayOf(all[0].from)!==today) return {kind:'before',item:all[0]};
+  if(dayOf(item.from)!==today) return {kind:'free',item};
+  if(t<item.from-LEAD_MIN*60000) return {kind:'later',item};
+  if(t<item.from) return {kind:'soon',item};
   /* only a written order can claim the tight treatment */
   return {kind:(!item.derived&&item.e.level==='critical')?'tight':'go',item};
 }
@@ -528,13 +549,14 @@ function setFollowOpen(o){
 
 function renderFollow(){
   if(document.documentElement.dataset.mode!=='follow') return;
-  const now=Date.now(), st=followState(now), card=$('#flCard');
+  const t=now(), st=followState(t), card=$('#flCard');
   $('#flTrip').textContent=meta.title;
   $('#flWhen').textContent=new Intl.DateTimeFormat('zh-TW',
     {timeZone:TZ,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})
-    .format(new Date(now));
+    .format(new Date(t));
+  $('#flPreview').hidden=previewAt==null;
 
-  const quiet=st.kind==='done'||st.kind==='free';
+  const quiet=st.kind==='done'||st.kind==='free'||st.kind==='before';
   card.classList.toggle('hot',st.kind==='tight');
   card.classList.toggle('calm',quiet);
   ['#flRoute','#flWin','#flSteps','#flMore'].forEach(id=>$(id).hidden=quiet);
@@ -552,6 +574,16 @@ function renderFollow(){
     $('#flKicker').textContent='';
     $('#flLine').textContent='旅程完成';
     $('#flBecause').textContent='所有固定行程都結束了。';
+    $('#flGround').textContent='';
+    return;
+  }
+  if(st.kind==='before'){
+    const b=st.item.brief, days=Math.ceil((st.item.from-t)/864e5);
+    $('#flGlyph').innerHTML=icon('luggage');
+    $('#flKicker').textContent='出發前';
+    $('#flLine').textContent=`還有 ${days} 天`;
+    $('#flBecause').textContent=
+      `${dayOf(st.item.from).slice(5).replace('-','/')} ${clockAt(b.window.from)}「${b.line}」開始。到那天為止這裡都會是這樣，行前要準備的東西在完整行程裡。`;
     $('#flGround').textContent='';
     return;
   }
@@ -577,14 +609,14 @@ function renderFollow(){
   /* before it starts, the number is time until it starts; after, time left
      against the wall — which is the deadline, not the departure */
   const target=(st.kind==='later'||st.kind==='soon')?from:(wall||to);
-  const s=span(target-now);
+  const s=span(target-t);
   $('#flCd').textContent=s.n;
   $('#flCdu').textContent=(st.kind==='later'||st.kind==='soon')
     ? `${s.u}${s.u?'後':''}${b.line}` : `${s.u?s.u+'，':''}到${w.wallLabel||w.toLabel}`;
 
-  const pct=t=>Math.max(0,Math.min(100,(t-from)/(to-from)*100));
-  $('#flFill').style.width=pct(now)+'%';
-  $('#flNow').style.left=Math.max(2,pct(now))+'%';
+  const pct=x=>Math.max(0,Math.min(100,(x-from)/(to-from)*100));
+  $('#flFill').style.width=pct(t)+'%';
+  $('#flNow').style.left=Math.max(2,pct(t))+'%';
   const hasWall=wall!=null;
   $('#flWall').hidden=!hasWall; $('#flWallTag').hidden=!hasWall;
   if(hasWall){
@@ -656,9 +688,10 @@ async function shareFollow(){
 }
 
 function setupFollow(){
+  readPreview();
   let saved=null;
   try{saved=localStorage.getItem(MODE_KEY)}catch{}
-  setMode(modeFromURL()||(saved==='follow'?'follow':'lead'));
+  setMode(modeFromURL()||(previewAt!=null?'follow':saved==='follow'?'follow':'lead'));
   $('#modeBtn').onclick=()=>setMode(document.documentElement.dataset.mode==='follow'?'lead':'follow');
   $('#shareFollowBtn').onclick=shareFollow;
   $('#flExit').onclick=()=>setMode('lead');
