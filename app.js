@@ -125,6 +125,7 @@ const rowKey=(e,dayIx)=>`${dayIx}|${e.time}|${e.title}`;
 /* only a row with a clock on it has a moment to be shown at */
 const peekable=(e,dayIx)=>!!windowOf(e,trip.days[dayIx].date);
 const briefOf=(e,dayIx)=>!!e.brief||!!getBriefs()[rowKey(e,dayIx)];
+const aiDraft=(e,dayIx)=>{const b=getBriefs()[rowKey(e,dayIx)];return !!b&&b.by==='ai';};
 function eventRow(e,dayIx){
   const isNext=rowKey(e,dayIx)===nextEventKey;
   const cls=[e.level||'', typeOf(e.type).group==='transport'?'is-transport':typeOf(e.type).group==='stay'?'is-stay':'', isNext?'is-next':''].join(' ').trim();
@@ -137,6 +138,7 @@ function eventRow(e,dayIx){
       ${e.route?routeStrip(e.route):''}
       <div class="meta">${e.meta.map(x=>`<span class="meta-chip">${x}</span>`).join('')}</div>
       <p class="note">${e.note}</p>
+      ${aiDraft(e,dayIx)?'<p class="ai-flag">AI 起草，還沒有人檢查</p>':''}
       ${peekable(e,dayIx)?`<div class="row-acts">
         <button class="peek" type="button" data-peek="${escapeHtml(rowKey(e,dayIx))}">
           ${icon('eye')}看跟隊畫面</button>
@@ -510,7 +512,9 @@ function getBriefs(){
     if(!b||typeof b!=='object'||Array.isArray(b)) continue;
     out[k]={line:str(b.line,12),because:str(b.because,120),
       need:str(b.need,160),fallback:str(b.fallback,160),
-      steps:Array.isArray(b.steps)?b.steps.filter(x=>typeof x==='string'&&x.trim()).slice(0,4).map(x=>str(x,20)):[]};
+      steps:Array.isArray(b.steps)?b.steps.filter(x=>typeof x==='string'&&x.trim()).slice(0,4).map(x=>str(x,20)):[],
+      /* who wrote it: anything a person has touched is not 'ai' */
+      by:b.by==='ai'?'ai':'me'};
   }
   return out;
 }
@@ -746,6 +750,141 @@ function peek(key){
   previewAt=item.from;
   setMode('follow');
 }
+
+/* ── AI 起草 ──────────────────────────────────────────────
+   Step one of getting content written by something other than a person
+   typing it: the app builds the prompt, a human carries it to Claude, and
+   the JSON comes back through the same validator the editor uses. No key
+   lives in this page, nothing is sent anywhere, and nothing is stored
+   until a person has looked at it.
+
+   This is deliberately the cheap version. It answers the question that
+   decides whether the expensive version is worth building: is what comes
+   back actually good enough to hand somebody in an airport? */
+
+function briefRules(){
+  return [
+    '一句話（line）不超過 12 個字。這是口令，不是說明。超過 12 字就是失敗。',
+    '步驟（steps）最多 4 步，每步最多 8 個字，是動作不是描述。做不到 4 步以內就給比較少步。',
+    '為什麼（because）一到兩句，講這段為什麼重要、什麼會出錯。',
+    '帶什麼（need）只寫這一段真的會用到的東西。沒有就留空字串。',
+    '萬一來不及（fallback）寫具體的下一步動作。不知道就留空字串，不要編。',
+    '語氣是同行的朋友在提醒，不是軍事命令，也不是客服。不要用「請」「務必」「敬請」。',
+    '全部用繁體中文。',
+    '**只能用下面提供的資料。不確定的電話、地址、價格、櫃檯位置一律留空，不要編造。**',
+  ].map((x,i)=>`${i+1}. ${x}`).join('\n');
+}
+function eventForPrompt(x){
+  const e=x.e, w=e.brief&&e.brief.window;
+  return {
+    key:rowKey(e,x.day),
+    日期:trip.days[x.day].label, 時間:e.time, 類型:e.type, 標題:e.title,
+    ...(e.meta&&e.meta.length?{標記:e.meta}:{}),
+    ...(e.note?{備註:e.note}:{}),
+    ...(e.route?{路線:`${e.route.from}${e.route.fromSub?`(${e.route.fromSub})`:''} → ${e.route.to}${e.route.toSub?`(${e.route.toSub})`:''}`}:{}),
+    ...(e.level==='critical'?{這是關鍵段落:true}:{}),
+    ...(w&&w.wall?{硬性死線:`${clockAt(w.wall)} ${w.wallLabel||''}`.trim()}:{}),
+  };
+}
+function draftPrompt(keys){
+  const all=entries();
+  const want=all.filter(x=>keys.includes(rowKey(x.e,x.day)));
+  return `你在幫一個旅行 app 寫「跟隊模式」的內容。
+
+跟隊模式是給團體旅行中**不負責規劃的那些人**看的畫面：一次只顯示一件事，就是「接下來要做什麼」。使用者可能剛下飛機、很累、沒在看行程表。他要的是一個口令加幾個動作，照著做就好。
+
+這趟旅行：${meta.title}　${meta.subtitle||''}
+
+完整行程（給你當上下文，不要為沒被要求的項目產生內容）：
+${JSON.stringify(all.map(eventForPrompt),null,1)}
+
+請為下面這 ${want.length} 個項目各寫一份內容：
+${want.map(x=>`- ${rowKey(x.e,x.day)}`).join('\n')}
+
+規則：
+${briefRules()}
+
+只輸出 JSON，不要有任何其他文字、不要用程式碼區塊。格式是一個物件，key 是上面列出的項目 key，value 長這樣：
+{"<key>":{"line":"","because":"","steps":[],"need":"","fallback":""}}`;
+}
+
+/* The same gate the editor uses, applied to something a model wrote —
+   because a model will go over twelve characters, and the limit is the
+   whole reason the screen is readable. */
+function checkDraft(k,v){
+  const bad=[];
+  if(!v||typeof v!=='object'||Array.isArray(v)) return [`${k}：不是一個物件`];
+  const line=typeof v.line==='string'?v.line.trim():'';
+  if(!line) bad.push(`${k}：沒有一句話`);
+  else if([...line].length>12) bad.push(`${k}：一句話 ${[...line].length} 字，超過 12（「${line}」）`);
+  const steps=Array.isArray(v.steps)?v.steps.filter(x=>typeof x==='string'&&x.trim()):[];
+  if(steps.length>4) bad.push(`${k}：${steps.length} 個步驟，超過 4`);
+  return bad;
+}
+function parseDraft(text,keys){
+  let raw=text.trim();
+  const fence=raw.match(/```(?:json)?\s*([\s\S]*?)```/);   /* it will use a code block anyway */
+  if(fence) raw=fence[1].trim();
+  let v;
+  try{ v=JSON.parse(raw); }
+  catch{ return {err:'這段不是有效的 JSON。整段貼上，不要只貼一部分。'}; }
+  if(!v||typeof v!=='object'||Array.isArray(v)) return {err:'最外層要是一個物件，key 是項目 key。'};
+  const out={}, bad=[], unknown=[];
+  for(const [k,item] of Object.entries(v)){
+    if(!keys.includes(k)){ unknown.push(k); continue; }
+    const errs=checkDraft(k,item);
+    if(errs.length){ bad.push(...errs); continue; }
+    out[k]={line:item.line.trim(),
+      because:typeof item.because==='string'?item.because.trim():'',
+      steps:(Array.isArray(item.steps)?item.steps:[]).filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()),
+      need:typeof item.need==='string'?item.need.trim():'',
+      fallback:typeof item.fallback==='string'?item.fallback.trim():''};
+  }
+  return {out,bad,unknown};
+}
+
+let draftKeys=[];
+function openDraft(keys){
+  draftKeys=keys;
+  const n=keys.length;
+  $('#dfFor').textContent=n===1
+    ? entries().filter(x=>rowKey(x.e,x.day)===keys[0]).map(x=>`${trip.days[x.day].label} ${x.e.time}　${x.e.title}`)[0]||''
+    : `${n} 個還沒有人寫過內容的項目`;
+  $('#dfPaste').value=''; $('#dfResult').hidden=true; $('#dfResult').textContent='';
+  $('#draftDialog').showModal();
+}
+function setupDraft(){
+  $('#closeDraft').onclick=()=>$('#draftDialog').close();
+  $('#dfCopy').onclick=async()=>{
+    const text=draftPrompt(draftKeys);
+    try{ await navigator.clipboard.writeText(text); toast('已複製，貼給 Claude'); }
+    catch{
+      /* clipboard can be refused; the text still has to be reachable */
+      $('#dfPaste').value=text; $('#dfPaste').select();
+      toast('無法自動複製，已放在下面的欄位，請手動複製');
+    }
+  };
+  $('#dfApply').onclick=()=>{
+    const r=parseDraft($('#dfPaste').value,draftKeys);
+    const box=$('#dfResult'); box.hidden=false;
+    if(r.err){ box.textContent=r.err; return; }
+    const got=Object.keys(r.out);
+    const notes=[];
+    if(r.bad.length) notes.push('沒有套用（不符合規則）：\n'+r.bad.join('\n'));
+    if(r.unknown.length) notes.push(`不認得的項目 ${r.unknown.length} 個，已略過。`);
+    const missing=draftKeys.filter(k=>!got.includes(k));
+    if(missing.length) notes.push(`還有 ${missing.length} 個項目沒有內容。`);
+    if(!got.length){ box.textContent=['一個都沒有套用。',...notes].join('\n\n'); return; }
+    const all=getBriefs();
+    for(const k of got) all[k]={...r.out[k],by:'ai'};
+    if(!saveBriefs(all)) return;
+    renderTimeline(); renderFollow();
+    box.textContent=[`已套用 ${got.length} 個，全部標記成「AI 起草」。`,
+      '這些內容沒有人檢查過。請逐一打開確認，改過之後標記就會消失。',...notes].join('\n\n');
+    toast(`已套用 ${got.length} 個`);
+  };
+}
+
 let editingKey='';
 function openBrief(key){
   const item=entries().find(x=>rowKey(x.e,x.day)===key);
@@ -784,8 +923,9 @@ function setupBriefEditor(){
     const steps=$('#bfSteps').value.split('\n').map(x=>x.trim()).filter(Boolean);
     if(steps.length>4){ $('#bfSteps').focus(); toast('步驟最多四步，記不住更多'); return; }
     const all=getBriefs();
+    /* a person has now read every field of this, so it is theirs */
     const next={line,because:$('#bfBecause').value.trim(),steps,
-      need:$('#bfNeed').value.trim(),fallback:$('#bfFallback').value.trim()};
+      need:$('#bfNeed').value.trim(),fallback:$('#bfFallback').value.trim(),by:'me'};
     if(!line&&!next.because&&!steps.length&&!next.need&&!next.fallback) delete all[editingKey];
     else all[editingKey]=next;
     if(saveBriefs(all)){
@@ -809,6 +949,13 @@ function setupFollow(){
   $('#flExit').onclick=()=>setMode('lead');
   $('#flMore').onclick=()=>setFollowOpen($('#flDetail').hidden);
   setupBriefEditor();
+  setupDraft();
+  $('#draftAllBtn').onclick=()=>{
+    const todo=entries().filter(x=>x.derived).map(x=>rowKey(x.e,x.day));
+    if(!todo.length){ toast('每個項目都已經有內容了'); return; }
+    openDraft(todo);
+  };
+  $('#bfDraft').onclick=()=>{ $('#briefDialog').close(); openDraft([editingKey]); };
 }
 
 /* ── theme ────────────────────────────────────────────────── */

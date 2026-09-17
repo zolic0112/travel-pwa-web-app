@@ -673,6 +673,78 @@ console.log('\n── follower mode shows one order and nothing else ──');
     check('no errors', !errs.length, errs[0] || '');
     await ctx.close();
   }
+  /* AI drafting, step one: the app writes the prompt, a person carries it,
+     and what comes back goes through the same gate the editor uses */
+  {
+    const { page, ctx, errs } = await open({ clock: '2026-09-17T14:00:00+08:00',
+      context: { permissions: ['clipboard-read', 'clipboard-write'] } });
+    const val = fn => page.evaluate(fn);
+    await page.click('#draftAllBtn'); await page.waitForTimeout(300);
+    check('it offers to draft exactly the rows nobody has written',
+      (await val(() => document.querySelector('#dfFor').textContent)).startsWith('5 個'),
+      await val(() => document.querySelector('#dfFor').textContent));
+    await page.click('#dfCopy'); await page.waitForTimeout(300);
+    const prompt = await val(() => navigator.clipboard.readText());
+    /* the prompt has to carry the trip, the rules and the exact keys, or what
+       comes back cannot be applied to anything */
+    check('the prompt carries the limits that make the screen readable',
+      prompt.includes('不超過 12 個字') && prompt.includes('最多 4 步'));
+    check('and the instruction not to make things up',
+      prompt.includes('不要編造'));
+    check('and the real keys it expects back',
+      prompt.includes('0|16:10–約19:00|KUL 入境、領行李 → Hotel Royal Signature'));
+    check('and the trip, not a different one', prompt.includes('馬來西亞'));
+
+    const KUL = '0|16:10–約19:00|KUL 入境、領行李 → Hotel Royal Signature';
+    /* a model will go over twelve characters; the limit is the whole reason
+       the screen works, so nothing over it may be stored */
+    await page.fill('#dfPaste', '```json\n' + JSON.stringify({
+      [KUL]: { line: '這一句話整整超過了十二個字的上限', because: 'x', steps: ['a','b','c','d','e'], need: '', fallback: '' },
+      'nope|x|y': { line: '短', because: '', steps: [], need: '', fallback: '' },
+    }) + '\n```');
+    await page.click('#dfApply'); await page.waitForTimeout(400);
+    const said = await val(() => document.querySelector('#dfResult').textContent);
+    check('an over-long line is refused, and the reason names it', said.includes('16 字'), said.slice(0, 80));
+    check('too many steps are refused too', said.includes('5 個步驟'));
+    check('a key it invented is skipped', said.includes('不認得的項目 1 個'));
+    check('and nothing at all was stored', (await val(() => localStorage.getItem('my2026.briefs.v1'))) === null);
+
+    await page.fill('#dfPaste', JSON.stringify({
+      [KUL]: { line: '入境後去飯店', because: '排隊加領行李要抓 1.5–2.5 小時。', steps: ['入境','領行李','去飯店'], need: '', fallback: '' },
+    }));
+    await page.click('#dfApply'); await page.waitForTimeout(400);
+    check('a draft that obeys the rules is applied and says so',
+      (await val(() => document.querySelector('#dfResult').textContent)).includes('已套用 1 個'));
+    await page.click('#closeDraft'); await page.waitForTimeout(300);
+    check('the row says out loud that nobody has checked it',
+      (await val(() => document.querySelectorAll('.ai-flag').length)) === 1);
+    await page.evaluate(() => document.querySelector('[data-peek*="入境、領行李"]').click());
+    await page.waitForTimeout(400);
+    check('and follower mode uses it like any written brief',
+      (await read(page)).steps === '入境/領行李/去飯店');
+    await page.click('#flExit'); await page.waitForTimeout(250);
+    /* the flag is a claim about human attention, so reading it must clear it */
+    await page.evaluate(() => document.querySelector('[data-edit*="入境、領行李"]').click());
+    await page.waitForTimeout(350);
+    await page.fill('#bfLine', '入境後直接去飯店');
+    await page.evaluate(() => document.querySelector('#briefForm button[value=default]').click());
+    await page.waitForTimeout(400);
+    check('once a person has edited it, it stops being an AI draft',
+      (await val(() => document.querySelectorAll('.ai-flag').length)) === 0
+      && (await val(() => JSON.parse(localStorage.getItem('my2026.briefs.v1'))[
+        '0|16:10–約19:00|KUL 入境、領行李 → Hotel Royal Signature'].by)) === 'me');
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+  {
+    const { page, ctx } = await open({ clock: '2026-09-17T14:00:00+08:00' });
+    await page.click('#draftAllBtn'); await page.waitForTimeout(300);
+    await page.click('#dfApply'); await page.waitForTimeout(200);
+    check('pasting nothing is told what is wrong, not ignored',
+      (await page.evaluate(() => document.querySelector('#dfResult').textContent)).includes('JSON'));
+    await ctx.close();
+  }
+
   for (const [label, value] of [
     ['malformed JSON', '{{{'],
     ['an array', '[1,2,3]'],
