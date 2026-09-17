@@ -1,5 +1,9 @@
 # 旅程助手 PWA
 
+> **設計理由不在這份檔案裡。** 這是什麼產品、為什麼這樣做、接下來要做什麼，看 [`docs/`](docs/)：
+> [`product.md`](docs/product.md)（產品前提）・[`architecture.md`](docs/architecture.md)（架構與產品化的路）・
+> [`decisions.md`](docs/decisions.md)（決策與推翻條件）・[`roadmap.md`](docs/roadmap.md)（接下來）
+
 一支純靜態、零相依的行程 PWA。目前載的是「馬來西亞 6天5夜」，但**行程資料與程式是分開的**：
 換一趟旅行只需要換 `trip.js`，不必動 `app.js`。
 
@@ -19,7 +23,7 @@
 1. 複製 `trip.js`，改 `meta.id`。這個 id 是 localStorage 的命名空間，換了 id 新旅行就有自己的勾選、自訂行程與主題，不會沿用上一趟的。
 2. 換掉 `meta`、`days`、`todos`、`costs`、`sources`。`meta.currency`、`meta.party`、`meta.tz` / `meta.timeZone` 都會被畫面沿用，不必另外改程式。
 3. 需要倒數的事件，直接在那筆 event 上掛 `milestone`。倒數清單是從事件推導出來的，所以不可能指到一筆已經被改掉或刪掉的列。
-4. 要在跟隊模式出現的事件，在那筆 event 上掛 `brief`：`line`（≤12 字的口令）、`because`、`steps`、`need`、`fallback`，以及 `window`（`from` / `to` 必填，`wall` 是真正的死線）。只有帶 `milestone` 的事件才能掛 `brief`。
+4. **跟隊模式不需要任何額外設定就會動**：有時間的事件會自動推導出一張卡。要講得更好的事件，在那筆 event 上掛 `brief`：`line`（≤12 字的口令）、`because`、`steps`、`need`、`fallback`，以及 `window`（`from` / `to` 必填，`wall` 是真正的死線）。只有帶 `milestone` 的事件才能掛 `brief`。
 5. 每則 `todos` 都要有唯一的 `id`。**勾選狀態是存在這個 id 上的**，所以 id 一旦發出去就不要再改；順序可以隨便調、中間可以插件新的，別人的勾選不會跑掉。
 6. 同步 `manifest.webmanifest` 的 `name` / `short_name` / `description`。
 7. 跑 `node scripts/check-trip.mjs`。
