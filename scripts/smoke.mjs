@@ -581,6 +581,34 @@ console.log('\n── follower mode shows one order and nothing else ──');
       (await read(page)).line === '沒有要趕的事');
     await ctx.close();
   }
+  /* the answer to "I want to tap a row and see it": every row with a clock
+     offers the follower view of itself */
+  {
+    const { page, ctx, errs } = await open({ clock: '2026-09-17T14:00:00+08:00' });
+    const val = fn => page.evaluate(fn);
+    check('a row with a clock offers it, a row without one does not',
+      (await val(() => document.querySelectorAll('.peek').length)) === 4
+      && (await val(() => document.querySelectorAll('.tl-row').length)) === 5,
+      `${await val(() => document.querySelectorAll('.peek').length)} of ${await val(() => document.querySelectorAll('.tl-row').length)}`);
+    await page.evaluate(() => [...document.querySelectorAll("#dayStrip .day-chip")]
+      .find(x => /全部/.test(x.textContent))?.click());
+    await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('.peek[data-peek*="長榮"]').scrollIntoView({ block: 'center' }));
+    await page.tap('.peek[data-peek*="長榮"]'); await page.waitForTimeout(400);
+    check('tapping one shows what that moment will say, three weeks early',
+      (await val(() => document.documentElement.dataset.mode)) === 'follow'
+      && (await val(() => document.querySelector('#flLine').textContent)) === '直接去長榮報到'
+      && (await val(() => document.querySelector('#flCd').textContent)) === '2:45');
+    check('marked a preview, so it is never mistaken for the real state',
+      await val(() => !document.querySelector('#flPreview').hidden));
+    await page.tap('#flExit'); await page.waitForTimeout(300);
+    await page.tap('#modeBtn'); await page.waitForTimeout(300);
+    check('and leaving it leaves the preview behind',
+      (await val(() => document.querySelector('#flLine').textContent)) === '還有 21 天'
+      && (await val(() => document.querySelector('#flPreview').hidden)), await val(() => document.querySelector('#flLine').textContent));
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
   /* ?at= is how anybody checks a moment that has not arrived yet */
   {
     const { page, ctx, errs } = await open({ query: '?at=2026-10-13T11:45', clock: '2026-09-17T14:00:00+08:00' });
