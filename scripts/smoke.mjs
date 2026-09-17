@@ -61,13 +61,13 @@ for (const [label, value] of [
   ['a date outside the trip', '[{"id":"1","date":"1999-01-01","time":"10:00","title":"x","type":"景點"}]'],
   ['a non-time value', '[{"id":"2","date":"2026-10-08","time":"banana","title":"y","type":"景點"}]'],
 ]) {
-  const { page, ctx, errs } = await open({ seed: `localStorage.setItem('myTrip2026.plans.v1', ${JSON.stringify(value)})` });
+  const { page, ctx, errs } = await open({ seed: `localStorage.setItem('my2026.plans.v1', ${JSON.stringify(value)})` });
   const alive = await page.evaluate(() => !!document.querySelector('.tl-row') && !!document.querySelector('.tab'));
   check(`survives ${label}`, alive && !errs.length, errs[0] || (alive ? '' : 'nothing rendered'));
   await ctx.close();
 }
 {
-  const { page, ctx } = await open({ seed: `localStorage.setItem('myTrip2026.todos', '["a","b","c"]')` });
+  const { page, ctx } = await open({ seed: `localStorage.setItem('my2026.todos', '["a","b","c"]')` });
   const pct = await page.evaluate(() => document.querySelector('#todoPercent').textContent);
   check('an array of to-do state does not tick anything', pct === '0%', `progress=${pct}`);
   await ctx.close();
@@ -76,12 +76,18 @@ for (const [label, value] of [
 console.log('\n── stored values reach templates as text, never as markup ──');
 {
   const evil = '"><img src=x onerror="window.__pwned=1">';
-  const { page, ctx } = await open({ seed: `localStorage.setItem('myTrip2026.plans.v1', JSON.stringify([
+  const { page, ctx } = await open({ seed: `localStorage.setItem('my2026.plans.v1', JSON.stringify([
     {id:'a',date:'2026-10-08',time:${JSON.stringify(evil)},type:'景點',title:'t'},
     {id:'b',date:'2026-10-08',time:'10:00',type:${JSON.stringify(evil)},title:${JSON.stringify(evil)},
      duration:${JSON.stringify(evil)},note:${JSON.stringify(evil)}}]))` });
   await page.click('.tab[data-view="planner"]');
   await page.waitForTimeout(400);
+  /* the seeded key must be one the app actually reads, or this whole section
+     passes by testing an empty page — which is exactly what it did while the
+     namespace said myTrip2026 and the app said my2026 */
+  check('the hostile plans were actually loaded', (await page.evaluate(() =>
+    document.querySelectorAll('#planList .plan-card').length)) >= 1,
+    String(await page.evaluate(() => document.querySelector('#planList')?.children.length)));
   check('no injected script runs', !(await page.evaluate(() => !!window.__pwned)));
   check('no injected elements', (await page.evaluate(() => document.querySelectorAll('#planList img').length)) === 0);
   await ctx.close();
@@ -587,9 +593,9 @@ console.log('\n── follower mode shows one order and nothing else ──');
     const { page, ctx, errs } = await open({ clock: '2026-09-17T14:00:00+08:00' });
     const val = fn => page.evaluate(fn);
     check('a row with a clock offers it, a row without one does not',
-      (await val(() => document.querySelectorAll('.peek').length)) === 4
+      (await val(() => document.querySelectorAll('[data-peek]').length)) === 4
       && (await val(() => document.querySelectorAll('.tl-row').length)) === 5,
-      `${await val(() => document.querySelectorAll('.peek').length)} of ${await val(() => document.querySelectorAll('.tl-row').length)}`);
+      `${await val(() => document.querySelectorAll('[data-peek]').length)} of ${await val(() => document.querySelectorAll('.tl-row').length)}`);
     await page.evaluate(() => [...document.querySelectorAll("#dayStrip .day-chip")]
       .find(x => /全部/.test(x.textContent))?.click());
     await page.waitForTimeout(300);
@@ -607,6 +613,76 @@ console.log('\n── follower mode shows one order and nothing else ──');
       (await val(() => document.querySelector('#flLine').textContent)) === '還有 21 天'
       && (await val(() => document.querySelector('#flPreview').hidden)), await val(() => document.querySelector('#flLine').textContent));
     check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+  /* leading is editing a draft, not filling a form */
+  {
+    const { page, ctx, errs } = await open({ clock: '2026-09-17T14:00:00+08:00' });
+    const val = fn => page.evaluate(fn);
+    const key = await val(() => [...document.querySelectorAll('[data-edit]')]
+      .map(x => x.dataset.edit).find(k => k.includes('入境')));
+    check('an unwritten row invites one to be written', await val(() =>
+      [...document.querySelectorAll('[data-edit]')].find(x => x.dataset.edit.includes('入境'))
+        .textContent.includes('寫')));
+    await page.evaluate(k => document.querySelector(`[data-edit="${k}"]`).click(), key);
+    await page.waitForTimeout(300);
+    check('it opens naming the row it is for', (await val(() =>
+      document.querySelector('#briefFor').textContent)).includes('KUL 入境'));
+    /* the field caps it at 12, so this sets the value past the cap directly:
+       the check has to hold when the input's own limit is not what stopped it */
+    await page.evaluate(() => { document.querySelector('#bfLine').value = '這行字整整超過十二個字很多'; });
+    await page.evaluate(() => document.querySelector('#briefForm button[value=default]').click());
+    await page.waitForTimeout(250);
+    check('a line too long to read at a glance is refused', await val(() =>
+      document.querySelector('#briefDialog').open
+      && document.querySelector('#toast').textContent.includes('12')));
+    await page.fill('#bfLine', '先領行李再入境');
+    await page.fill('#bfSteps', '領行李\n入境\n叫車\n到飯店\n多的一步');
+    await page.evaluate(() => document.querySelector('#briefForm button[value=default]').click());
+    await page.waitForTimeout(250);
+    check('more steps than anybody holds in their head is refused', await val(() =>
+      document.querySelector('#briefDialog').open
+      && document.querySelector('#toast').textContent.includes('四步')));
+    await page.fill('#bfSteps', '領行李\n入境\n叫車');
+    await page.fill('#bfFallback', '行李沒到就去 baggage claim 櫃檯');
+    await page.evaluate(() => document.querySelector('#briefForm button[value=default]').click());
+    await page.waitForTimeout(350);
+    check('what was written is what the row now says', await val(() =>
+      [...document.querySelectorAll('[data-edit]')].find(x => x.dataset.edit.includes('入境'))
+        .textContent.includes('改')));
+    await page.evaluate(k => document.querySelector(`[data-peek="${k}"]`).click(), key);
+    await page.waitForTimeout(350);
+    const r = await read(page);
+    check('and follower mode stops treating it as an unwritten row',
+      r.line === '先領行李再入境' && r.steps === '領行李/入境/叫車'
+      && !(await val(() => document.querySelector('#flCard').classList.contains('plain'))), `${r.line} / ${r.steps}`);
+    /* the row's clock stays the itinerary's: an override carries words only */
+    check('the window is still the itinerary\'s, not the editor\'s', r.ends === '16:10→19:00', r.ends);
+    await page.tap('#flExit'); await page.waitForTimeout(250);
+    await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForTimeout(800);
+    check('it survives a reload', await val(() =>
+      [...document.querySelectorAll('[data-edit]')].find(x => x.dataset.edit.includes('入境'))
+        .textContent.includes('改')));
+    await page.evaluate(k => document.querySelector(`[data-edit="${k}"]`).click(), key);
+    await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('#bfClear').click());
+    await page.waitForTimeout(350);
+    check('clearing returns the row to what the itinerary says', await val(() =>
+      [...document.querySelectorAll('[data-edit]')].find(x => x.dataset.edit.includes('入境'))
+        .textContent.includes('寫')));
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+  for (const [label, value] of [
+    ['malformed JSON', '{{{'],
+    ['an array', '[1,2,3]'],
+    ['a null override', '{"0|x|y":null}'],
+    ['steps that are not strings', '{"0|16:10–約19:00|KUL 入境、領行李 → Hotel Royal Signature":{"steps":[1,null,{}]}}'],
+  ]) {
+    const { page, ctx, errs } = await open({ query: '?mode=follow', clock: '2026-10-08T17:30:00+08:00',
+      seed: `localStorage.setItem('my2026.briefs.v1', ${JSON.stringify(value)})` });
+    check(`a written brief stored as ${label} does not take the screen down`,
+      !!(await read(page)).line && !errs.length, errs[0] || '');
     await ctx.close();
   }
   /* ?at= is how anybody checks a moment that has not arrived yet */

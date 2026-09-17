@@ -56,6 +56,7 @@ const ICO = {
   moon:P("<path d='M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z'/>"),
   plus:P("<path d='M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z'/>"),
   share:P("<path d='M214.64,82.34l-56-56A8,8,0,0,0,144,32V64.65C88.42,68.53,48,111.62,48,168a8,8,0,0,0,14.63,4.46c13.1-19.65,35.21-32,58.53-34.94A88.24,88.24,0,0,1,144,136v32a8,8,0,0,0,13.66,5.66l56-56A8,8,0,0,0,214.64,82.34ZM160,148.69V128a8,8,0,0,0-8-8c-2,0-4.06,0-6.07.14a114.22,114.22,0,0,0-30.2,5.53,113.28,113.28,0,0,0-50.11,31.63C71,116.35,105.16,80,148,80a8,8,0,0,0,8-8V51.31L196.69,92Z'/>"),
+  pencil:P("<path d='M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z'/>"),
   eye:P("<path d='M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z'/>"),
   copy:P("<path d='M184,64H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H184a8,8,0,0,0,8-8V72A8,8,0,0,0,184,64Zm-8,144H48V80H176ZM224,40V184a8,8,0,0,1-16,0V48H72a8,8,0,0,1,0-16H216A8,8,0,0,1,224,40Z'/>"),
   check2:P("<path d='M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z'/>")
@@ -123,6 +124,7 @@ let nextEventKey='';
 const rowKey=(e,dayIx)=>`${dayIx}|${e.time}|${e.title}`;
 /* only a row with a clock on it has a moment to be shown at */
 const peekable=(e,dayIx)=>!!windowOf(e,trip.days[dayIx].date);
+const briefOf=(e,dayIx)=>!!e.brief||!!getBriefs()[rowKey(e,dayIx)];
 function eventRow(e,dayIx){
   const isNext=rowKey(e,dayIx)===nextEventKey;
   const cls=[e.level||'', typeOf(e.type).group==='transport'?'is-transport':typeOf(e.type).group==='stay'?'is-stay':'', isNext?'is-next':''].join(' ').trim();
@@ -135,8 +137,12 @@ function eventRow(e,dayIx){
       ${e.route?routeStrip(e.route):''}
       <div class="meta">${e.meta.map(x=>`<span class="meta-chip">${x}</span>`).join('')}</div>
       <p class="note">${e.note}</p>
-      ${peekable(e,dayIx)?`<button class="peek" type="button" data-peek="${escapeHtml(rowKey(e,dayIx))}">
-        ${icon('eye')}用跟隊模式看這段</button>`:''}
+      ${peekable(e,dayIx)?`<div class="row-acts">
+        <button class="peek" type="button" data-peek="${escapeHtml(rowKey(e,dayIx))}">
+          ${icon('eye')}看跟隊畫面</button>
+        <button class="peek" type="button" data-edit="${escapeHtml(rowKey(e,dayIx))}">
+          ${icon('pencil')}${briefOf(e,dayIx)?'改跟隊內容':'寫跟隊內容'}</button>
+      </div>`:''}
     </div>
   </article>`;
 }
@@ -489,11 +495,42 @@ function derive(e,date){
             to:new Date(w.to).toISOString(),toLabel:'結束'},
   };
 }
+/* What a leader writes lives beside trip.js, not in it: the row's times stay
+   the itinerary's (moving them here would quietly desync the two), and only
+   the words are overridden. Nobody fills this in from blank — the dialog
+   opens holding whatever the row already says. */
+const briefKey=ns('briefs.v1');
+const str=(v,n)=>typeof v==='string'?v.slice(0,n):'';
+function getBriefs(){
+  let v=null;
+  try{ v=JSON.parse(localStorage.getItem(briefKey)||'{}'); }catch{}
+  if(!v||typeof v!=='object'||Array.isArray(v)) return {};
+  const out={};
+  for(const [k,b] of Object.entries(v)){
+    if(!b||typeof b!=='object'||Array.isArray(b)) continue;
+    out[k]={line:str(b.line,12),because:str(b.because,120),
+      need:str(b.need,160),fallback:str(b.fallback,160),
+      steps:Array.isArray(b.steps)?b.steps.filter(x=>typeof x==='string'&&x.trim()).slice(0,4).map(x=>str(x,20)):[]};
+  }
+  return out;
+}
+function saveBriefs(v){
+  try{ localStorage.setItem(briefKey,JSON.stringify(v)); return true; }
+  catch{ toast('無法儲存，裝置儲存空間已滿'); return false; }
+}
 function entries(){
+  const mine=getBriefs();
   return trip.days.flatMap((d,day)=>d.events.map(e=>{
-    const brief=e.brief||derive(e,d.date);
-    if(!brief) return null;
-    return {e,day,brief,derived:!e.brief,
+    const base=e.brief||derive(e,d.date);
+    if(!base) return null;
+    const own=mine[rowKey(e,day)];
+    /* an override replaces only the fields it fills; the window is never its
+       business, so the two can never drift apart */
+    const brief=own?{...base,
+      line:own.line||base.line, because:own.because||base.because,
+      steps:own.steps.length?own.steps:base.steps,
+      need:own.need||base.need, fallback:own.fallback||base.fallback}:base;
+    return {e,day,brief,written:!!e.brief||!!own,derived:!e.brief&&!own,
       from:+new Date(brief.window.from),to:+new Date(brief.window.to)};
   }).filter(Boolean)).sort((a,b)=>a.from-b.from);
 }
@@ -642,7 +679,8 @@ function renderFollow(){
     $('#flLegIcon').innerHTML=r.kind==='air'?ICO.plane:ICO.train;
   }
   /* nothing was written, so nothing is claimed */
-  $('#flSteps').hidden=plain; $('#flMore').hidden=plain;
+  $('#flSteps').hidden=plain||!b.steps.length;
+  $('#flMore').hidden=plain||!(b.need||b.fallback);
   if(plain) setFollowOpen(false);
   $('#flSteps').innerHTML=b.steps
     .map((x,i)=>`${i?'<i>→</i>':''}<b>${escapeHtml(x)}</b>`).join('');
@@ -708,11 +746,60 @@ function peek(key){
   previewAt=item.from;
   setMode('follow');
 }
+let editingKey='';
+function openBrief(key){
+  const item=entries().find(x=>rowKey(x.e,x.day)===key);
+  if(!item) return;
+  editingKey=key;
+  const own=getBriefs()[key], b=item.brief;
+  $('#briefFor').textContent=`${trip.days[item.day].label} ${item.e.time}　${item.e.title}`;
+  $('#bfLine').value=own?own.line:(item.derived?'':b.line);
+  $('#bfBecause').value=own?own.because:(item.derived?'':b.because);
+  $('#bfSteps').value=(own?own.steps:item.derived?[]:b.steps).join('\n');
+  $('#bfNeed').value=own?own.need:(item.derived?'':b.need);
+  $('#bfFallback').value=own?own.fallback:(item.derived?'':b.fallback);
+  $('#bfClear').hidden=!own;
+  countLine();
+  $('#briefDialog').showModal(); setTimeout(()=>$('#bfLine').focus(),80);
+}
+function countLine(){ $('#bfCount').textContent=String([...$('#bfLine').value.trim()].length); }
+function setupBriefEditor(){
+  $('#bfLine').oninput=countLine;
+  $('#closeBrief').onclick=$('#cancelBrief').onclick=()=>$('#briefDialog').close();
+  $('#bfClear').onclick=()=>{
+    const all=getBriefs(), gone=all[editingKey];
+    delete all[editingKey];
+    if(saveBriefs(all)){
+      $('#briefDialog').close(); renderTimeline(); renderFollow();
+      toast('已清除，改回行程原本的內容',{label:'復原',fn(){
+        const back=getBriefs(); back[editingKey]=gone;
+        if(saveBriefs(back)){renderTimeline();renderFollow();toast('已復原');}
+      }});
+    }
+  };
+  $('#briefForm').onsubmit=ev=>{
+    ev.preventDefault();
+    const line=$('#bfLine').value.trim();
+    if([...line].length>12){ $('#bfLine').focus(); toast('一句話請控制在 12 個字以內'); return; }
+    const steps=$('#bfSteps').value.split('\n').map(x=>x.trim()).filter(Boolean);
+    if(steps.length>4){ $('#bfSteps').focus(); toast('步驟最多四步，記不住更多'); return; }
+    const all=getBriefs();
+    const next={line,because:$('#bfBecause').value.trim(),steps,
+      need:$('#bfNeed').value.trim(),fallback:$('#bfFallback').value.trim()};
+    if(!line&&!next.because&&!steps.length&&!next.need&&!next.fallback) delete all[editingKey];
+    else all[editingKey]=next;
+    if(saveBriefs(all)){
+      $('#briefDialog').close(); renderTimeline(); renderFollow(); toast('已儲存');
+    }
+  };
+}
 function setupFollow(){
   readPreview();
   $('#timeline').addEventListener('click',ev=>{
-    const b=ev.target.closest('.peek');
-    if(b) peek(b.dataset.peek);
+    const b=ev.target.closest('[data-peek]');
+    if(b){ peek(b.dataset.peek); return; }
+    const w=ev.target.closest('[data-edit]');
+    if(w) openBrief(w.dataset.edit);
   });
   let saved=null;
   try{saved=localStorage.getItem(MODE_KEY)}catch{}
@@ -721,6 +808,7 @@ function setupFollow(){
   $('#shareFollowBtn').onclick=shareFollow;
   $('#flExit').onclick=()=>setMode('lead');
   $('#flMore').onclick=()=>setFollowOpen($('#flDetail').hidden);
+  setupBriefEditor();
 }
 
 /* ── theme ────────────────────────────────────────────────── */

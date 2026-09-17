@@ -260,6 +260,33 @@
     </form>
   </dialog>
 
+  <!-- Nobody fills this in from blank: it opens already holding whatever the
+       row says, so leading is editing a draft rather than writing a form. -->
+  <dialog id="briefDialog">
+    <form id="briefForm" method="dialog">
+      <div class="dialog-head"><h2>這段要跟隊的人做什麼</h2><button type="button" id="closeBrief" aria-label="關閉">×</button></div>
+      <p class="dialog-hint" id="briefFor"></p>
+      <div class="form-grid">
+        <label class="full">一句話<input id="bfLine" type="text" maxlength="12" placeholder="例如：直接去長榮報到"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next" />
+          <span class="field-note"><span id="bfCount">0</span>／12 字，越短越好</span></label>
+        <label class="full">為什麼<textarea id="bfBecause" rows="2" maxlength="120" placeholder="例如：剛落地吉隆坡。長榮櫃檯 14:30 就關了。"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next"></textarea></label>
+        <label class="full">步驟<textarea id="bfSteps" rows="4" maxlength="120" placeholder="一行一步，最多四步&#10;領行李&#10;轉機櫃檯&#10;報到託運"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next"></textarea></label>
+        <label class="full">帶什麼<textarea id="bfNeed" rows="2" maxlength="160" placeholder="護照、登機證、託運重量⋯⋯"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next"></textarea></label>
+        <label class="full">萬一來不及<textarea id="bfFallback" rows="2" maxlength="160" placeholder="打給誰、改哪一班、不要離開哪裡"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"></textarea></label>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn quiet danger" id="bfClear" hidden>清除</button>
+        <button type="button" class="btn quiet" id="cancelBrief">取消</button>
+        <button class="btn primary" value="default">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="sourceDialog">
     <div class="dialog-head"><h2>資料來源</h2><button id="closeSources" aria-label="關閉">×</button></div>
     <div id="sourceList" class="source-list"></div>
