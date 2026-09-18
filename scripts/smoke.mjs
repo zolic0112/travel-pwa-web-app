@@ -690,7 +690,14 @@ console.log('\n── follower mode shows one order and nothing else ──');
     check('the prompt carries the limits that make the screen readable',
       prompt.includes('不超過 12 個字') && prompt.includes('最多 4 步'));
     check('and the instruction not to make things up',
-      prompt.includes('不要編造'));
+      prompt.includes('兩件事都不能編'));
+    /* every one of these rules exists because a real draft broke it */
+    check('and not to name the next leg in this leg\'s line', prompt.includes('不是下一段的'));
+    check('and to leave 帶什麼 empty rather than fill it with 行李',
+      prompt.includes('預設留空') && prompt.includes('「行李」'));
+    check('and not to invent an instruction nobody gave', prompt.includes('全員集合'));
+    check('the rules are numbered without the sub-items taking numbers',
+      /10\. \*\*只能用下面提供的資料/.test(prompt) && !/11\. 　a/.test(prompt));
     check('and the real keys it expects back',
       prompt.includes('0|16:10–約19:00|KUL 入境、領行李 → Hotel Royal Signature'));
     check('and the trip, not a different one', prompt.includes('馬來西亞'));
@@ -719,10 +726,31 @@ console.log('\n── follower mode shows one order and nothing else ──');
       && (await val(() => localStorage.getItem('my2026.briefs.v1'))) === null,
       (await val(() => document.querySelector('#dfResult').textContent)).slice(0, 90));
 
+    /* an outright restatement of the line is refused outright */
     await page.fill('#dfPaste', JSON.stringify({
-      [KUL]: { line: '入境後去飯店', because: '排隊加領行李要抓 1.5–2.5 小時。', steps: ['入境','領行李','去飯店'], need: '', fallback: '' },
+      [KUL]: { line: '入境後去飯店', because: 'x', steps: ['入境'], need: '', fallback: '入境後去飯店就好' },
     }));
     await page.click('#dfApply'); await page.waitForTimeout(400);
+    check('a fallback that is just the line again is refused',
+      (await val(() => document.querySelector('#dfResult').textContent)).includes('換句話說'));
+
+    /* a paraphrase is not certain enough to refuse, so it is applied and
+       pointed at — the real case from a real draft */
+    await page.fill('#dfPaste', JSON.stringify({
+      [KUL]: { line: '往第二航廈集合', because: 'x', steps: ['入境'], need: '', fallback: '直接往第二航廈前進' },
+    }));
+    await page.click('#dfApply'); await page.waitForTimeout(400);
+    const echoed = await val(() => document.querySelector('#dfResult').textContent);
+    check('a fallback that merely echoes the line is applied but flagged',
+      echoed.includes('已套用 1 個') && echoed.includes('換句話說'), echoed.slice(0, 60));
+
+    await page.fill('#dfPaste', JSON.stringify({
+      [KUL]: { line: '入境後去飯店', because: '排隊加領行李要抓 1.5–2.5 小時。', steps: ['入境','領行李','去飯店'],
+        need: '', fallback: '行李沒出來就去 baggage claim 櫃檯問。' },
+    }));
+    await page.click('#dfApply'); await page.waitForTimeout(400);
+    check('a real fallback is not flagged',
+      !(await val(() => document.querySelector('#dfResult').textContent)).includes('換句話說'));
     check('a draft that obeys the rules is applied and says so',
       (await val(() => document.querySelector('#dfResult').textContent)).includes('已套用 1 個'));
     await page.click('#closeDraft'); await page.waitForTimeout(300);
