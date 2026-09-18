@@ -696,8 +696,13 @@ console.log('\n── follower mode shows one order and nothing else ──');
     check('and to leave 帶什麼 empty rather than fill it with 行李',
       prompt.includes('預設留空') && prompt.includes('「行李」'));
     check('and not to invent an instruction nobody gave', prompt.includes('全員集合'));
+    /* a real draft answered 「09:15前進報到區」 — that is the deadline, not
+       what to do about missing it */
+    check('and that a deadline is not a fallback', prompt.includes('死線不是備案'));
+    /* the numbering must not depend on how many rules there happen to be */
     check('the rules are numbered without the sub-items taking numbers',
-      /10\. \*\*只能用下面提供的資料/.test(prompt) && !/11\. 　a/.test(prompt));
+      /\d+\. \*\*只能用下面提供的資料/.test(prompt) && !/\d+\. 　/.test(prompt)
+      && /\n　a\. /.test(prompt));
     check('and the real keys it expects back',
       prompt.includes('0|16:10–約19:00|KUL 入境、領行李 → Hotel Royal Signature'));
     check('and the trip, not a different one', prompt.includes('馬來西亞'));
