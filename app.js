@@ -769,15 +769,26 @@ function peek(key){
 const STEP_MAX=10;
 function briefRules(){
   return [
+    /* Every one of these exists because a real draft got it wrong. */
     '一句話（line）不超過 12 個字。這是口令，不是說明。超過 12 字就是失敗。',
+    '**一句話要講的是「這一段」本身的動作，不是下一段的。** 例如一段是「入境、領行李、走到車站」，那句話就不能寫成「搭車回家」—— 那是下一段的事，跟隊的人會跳過眼前該做的事。',
     `步驟（steps）最多 4 步，每步最多 ${STEP_MAX} 個字，是動作不是描述。做不到 4 步以內就給比較少步。`,
     '為什麼（because）一到兩句，講這段為什麼重要、什麼會出錯。',
-    '帶什麼（need）只寫這一段真的會用到的東西。沒有就留空字串。',
-    '萬一來不及（fallback）寫具體的下一步動作。不知道就留空字串，不要編。',
+    '**帶什麼（need）預設留空字串。** 只有資料裡明確提到的東西才寫（例如托運重量、特定證件）。不要寫「行李」「手機」「錢包」「充電器」這種每個人本來就會帶的東西 —— 那是雜訊，會讓真正重要的那一項被忽略。',
+    '**萬一來不及（fallback）只能從資料裡來。** 備註裡「不要…」「若…」「底線是…」「改…」這類句子就是它的來源，把那句話變成一個動作。資料裡沒有備案就留空字串。',
+    '**把一句話換句話說，不算 fallback。** 「直接往前走」「盡快前往」這種等於沒寫，寧可留空。',
     '語氣是同行的朋友在提醒，不是軍事命令，也不是客服。不要用「請」「務必」「敬請」。',
     '全部用繁體中文。',
-    '**只能用下面提供的資料。不確定的電話、地址、價格、櫃檯位置一律留空，不要編造。**',
-  ].map((x,i)=>`${i+1}. ${x}`).join('\n');
+    '**只能用下面提供的資料。** 兩件事都不能編：',
+    '　a. 不確定的事實 —— 電話、地址、價格、櫃檯位置、班次號碼，一律留空。',
+    '　b. **沒有人下過的動作** —— 不要自己加「全員集合」「拍照留念」「順便逛一下」這類指令。使用者會照著做，而那不是任何人要求他做的事。',
+  /* lines starting with a full-width space are continuations of the rule
+     above them, so they must not take a number of their own */
+  ].reduce((acc,x)=>{
+    if(x.startsWith('　')) acc.out.push(x);
+    else acc.out.push(`${++acc.n}. ${x}`);
+    return acc;
+  },{n:0,out:[]}).out.join('\n');
 }
 function eventForPrompt(x){
   const e=x.e, w=e.brief&&e.brief.window;
@@ -826,7 +837,24 @@ function checkDraft(k,v){
   if(steps.length>4) bad.push(`${k}：${steps.length} 個步驟，超過 4`);
   for(const st of steps) if([...st.trim()].length>STEP_MAX)
     bad.push(`${k}：步驟「${st.trim()}」${[...st.trim()].length} 字，超過 ${STEP_MAX}`);
+  /* A fallback that restates the line is worse than an empty one: it looks
+     like a plan while occupying the field somebody reads when things go
+     wrong. Seen in a real draft. An outright restatement is refused. */
+  const fb=typeof v.fallback==='string'?v.fallback.trim():'';
+  if(fb&&line&&(fb===line||fb.includes(line)))
+    bad.push(`${k}：「萬一來不及」只是把口令換句話說（「${fb}」），這種寧可留空`);
   return bad;
+}
+/* A paraphrase is not something code can be sure about, so it is pointed at
+   rather than refused — on the samples to hand, a restated fallback overlaps
+   the line by 56-63% of its characters while a real one sits at 0-13%. Six
+   samples is enough to raise a flag, nowhere near enough to throw work away. */
+const ECHO=0.5;
+function echoesLine(fb,line){
+  const clean=x=>[...x.replace(/[\s，。、！？「」（）()]/g,'')];
+  const L=new Set(clean(line)), F=clean(fb);
+  if(!F.length||!L.size) return false;
+  return F.filter(c=>L.has(c)).length/F.length>=ECHO;
 }
 function parseDraft(text,keys){
   let raw=text.trim();
@@ -836,18 +864,19 @@ function parseDraft(text,keys){
   try{ v=JSON.parse(raw); }
   catch{ return {err:'這段不是有效的 JSON。整段貼上，不要只貼一部分。'}; }
   if(!v||typeof v!=='object'||Array.isArray(v)) return {err:'最外層要是一個物件，key 是項目 key。'};
-  const out={}, bad=[], unknown=[];
+  const out={}, bad=[], unknown=[], weak=[];
   for(const [k,item] of Object.entries(v)){
     if(!keys.includes(k)){ unknown.push(k); continue; }
     const errs=checkDraft(k,item);
     if(errs.length){ bad.push(...errs); continue; }
+    if(item.fallback&&echoesLine(String(item.fallback).trim(),item.line.trim())) weak.push(k);
     out[k]={line:item.line.trim(),
       because:typeof item.because==='string'?item.because.trim():'',
       steps:(Array.isArray(item.steps)?item.steps:[]).filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()),
       need:typeof item.need==='string'?item.need.trim():'',
       fallback:typeof item.fallback==='string'?item.fallback.trim():''};
   }
-  return {out,bad,unknown};
+  return {out,bad,unknown,weak};
 }
 
 let draftKeys=[], beforeApply=null;
@@ -910,6 +939,9 @@ function setupDraft(){
     const notes=[];
     if(r.bad.length) notes.push('沒有套用（不符合規則）：\n'+r.bad.join('\n'));
     if(r.unknown.length) notes.push(`不認得的項目 ${r.unknown.length} 個，已略過。`);
+    if(r.weak&&r.weak.length) notes.push(
+      `這 ${r.weak.length} 個的「萬一來不及」看起來只是把口令換句話說，已經套用，但那一欄是出事時才會看的，值得先確認：\n`
+      +r.weak.join('\n'));
     const missing=draftKeys.filter(k=>!got.includes(k));
     if(missing.length) notes.push(`還有 ${missing.length} 個項目沒有內容。`);
     if(!got.length){ box.textContent=['一個都沒有套用。',...notes].join('\n\n'); return; }
