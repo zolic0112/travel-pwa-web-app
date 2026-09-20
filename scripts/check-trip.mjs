@@ -78,7 +78,11 @@ days.forEach((d, i) => {
       /* This is what a follower is told to do with their brain switched off,
          so it is checked harder than anything else in the file. */
       const br = e.brief, at = `${ev} brief`;
-      for (const k of ['line','because','need','fallback']) if (!isStr(br[k])) bad(at, `${k} is required`);
+      for (const k of ['line','because']) if (!isStr(br[k])) bad(at, `${k} is required`);
+      /* need and fallback are meant to be empty when the trip data holds
+         nothing for them — requiring content here is requiring invention,
+         which is the one thing the drafting rules forbid. */
+      for (const k of ['need','fallback']) if (typeof br[k] !== 'string') bad(at, `${k} must be a string (empty is fine, and is the right answer when there is nothing to say)`);
       if (isStr(br.line) && [...br.line].length > 12) bad(at, `line is ${[...br.line].length} characters; 12 is the limit — Chinese has no spaces, so a longer one breaks mid-word`);
       if (!Array.isArray(br.steps) || !br.steps.length || !br.steps.every(isStr)) bad(at, 'steps must be a non-empty array of strings');
       else if (br.steps.length > 4) bad(at, `${br.steps.length} steps; 4 is the limit for one glance`);
@@ -86,21 +90,28 @@ days.forEach((d, i) => {
          a limit only one of the three honours is not a limit. */
       else for (const st of br.steps) if ([...st].length > 10)
         bad(at, `step ${JSON.stringify(st)} is ${[...st].length} chars; 10 is the limit`);
-      const w = br.window || {};
-      for (const k of ['from','to']) {
-        if (!isStr(w[k]) || Number.isNaN(+new Date(w[k]))) { bad(at, `window.${k} is not a date`); continue; }
-        if (!/[+-]\d{2}:\d{2}$|Z$/.test(w[k])) bad(at, `window.${k} needs an explicit offset`);
+      /* The window is optional: app.js derives one from the event's own time
+         string. Author it only for labels nothing can derive (落地, 櫃檯關閉)
+         or for a hard wall. What a brief does need is a time to be shown at. */
+      if (!br.window) {
+        if (!/\d{1,2}:\d{2}/.test(e.time || ''))
+          bad(at, `no window, and "${e.time}" has no clock in it, so nothing could ever decide when to show this`);
+      } else {
+        const w = br.window;
+        for (const k of ['from','to']) {
+          if (!isStr(w[k]) || Number.isNaN(+new Date(w[k]))) { bad(at, `window.${k} is not a date`); continue; }
+          if (!/[+-]\d{2}:\d{2}$|Z$/.test(w[k])) bad(at, `window.${k} needs an explicit offset`);
+        }
+        for (const k of ['fromLabel','toLabel']) if (!isStr(w[k])) bad(at, `window.${k} is required`);
+        const t0 = +new Date(w.from), t1 = +new Date(w.to);
+        if (t0 && t1 && !(t0 < t1)) bad(at, 'window.from must come before window.to');
+        if (w.wall != null) {
+          const tw = +new Date(w.wall);
+          if (Number.isNaN(tw)) bad(at, 'window.wall is not a date');
+          else if (!(t0 <= tw && tw <= t1)) bad(at, 'window.wall falls outside from…to, so it would be drawn off the scale');
+          if (!isStr(w.wallLabel)) bad(at, 'window.wall needs a wallLabel');
+        }
       }
-      for (const k of ['fromLabel','toLabel']) if (!isStr(w[k])) bad(at, `window.${k} is required`);
-      const t0 = +new Date(w.from), t1 = +new Date(w.to);
-      if (t0 && t1 && !(t0 < t1)) bad(at, 'window.from must come before window.to');
-      if (w.wall != null) {
-        const tw = +new Date(w.wall);
-        if (Number.isNaN(tw)) bad(at, 'window.wall is not a date');
-        else if (!(t0 <= tw && tw <= t1)) bad(at, 'window.wall falls outside from…to, so it would be drawn off the scale');
-        if (!isStr(w.wallLabel)) bad(at, 'window.wall needs a wallLabel');
-      }
-      if (!e.milestone) bad(at, 'only an event with a milestone can carry a brief — nothing would ever show it');
     }
     if (e.milestone) {
       const ms = e.milestone;

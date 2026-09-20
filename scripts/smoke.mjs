@@ -37,8 +37,15 @@ const browser = await chromium.launch(EXEC ? { executablePath: EXEC } : {});
 const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
   permissions: ['clipboard-read', 'clipboard-write'] };
 
+const SAMPLE = path.join(HERE, 'fixtures/sample.trip.js');
 const open = async (opts = {}) => {
-  const ctx = await browser.newContext({ ...phone, ...opts.context });
+  /* Serving a different trip means blocking the service worker: it is
+     network-first for trip.js, and its fetch goes to the real server rather
+     than through this route, so after a reload the page would quietly be
+     back on the real trip. (Network-first is right in production — it is
+     what makes a deploy visible on the next load.) */
+  const ctx = await browser.newContext({ ...phone,
+    ...(opts.trip ? { serviceWorkers: 'block' } : {}), ...opts.context });
   if (opts.trip) await ctx.route('**/trip.js', r =>
     r.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(opts.trip, 'utf8') }));
   if (opts.clock) await ctx.addInitScript(`{const F=Date;const f=new F(${JSON.stringify(opts.clock)}).getTime();
@@ -534,14 +541,15 @@ console.log('\n── follower mode shows one order and nothing else ──');
     check('after the trip it is finished', (await read(page)).line === '旅程完成');
     await ctx.close();
   }
-  /* an event with a clock on it is already an answer to "what now" — the
-     screen must not go blank between the nine written orders */
+  /* An event with a clock on it is already an answer to "what now", even
+     with nothing written for it. Malaysia has a brief on every timed row
+     now, so this lives on the fixture — which is also the honest place for
+     it, since a trip with no briefs at all is where every trip starts. */
   for (const [clock, want] of [
-    ['2026-10-08T17:30:00+08:00', 'KUL 入境、領行李 → Hotel Royal Signature'],
-    ['2026-10-10T12:10:00+08:00', 'Hotel Royal Signature 退房／寄放行李'],
-    ['2026-10-13T20:40:00+08:00', 'TPE T2 入境／領行李 → A13 → A18'],
+    ['2027-03-05T10:00:00+09:00', '台北 TPE → 東京 NRT'],
+    ['2027-03-07T14:20:00+09:00', '新宿 → 成田機場'],
   ]) {
-    const { page, ctx, errs } = await open({ query: '?mode=follow', clock });
+    const { page, ctx, errs } = await open({ trip: SAMPLE, query: '?mode=follow', clock });
     const r = await read(page);
     check(`${clock.slice(5, 16)} answers from the itinerary instead of going quiet`,
       r.line === want && !r.calm, `${r.line}${r.calm ? ' (calm)' : ''}`);
@@ -550,6 +558,29 @@ console.log('\n── follower mode shows one order and nothing else ──');
       document.querySelector('#flSteps').hidden && document.querySelector('#flMore').hidden
       && document.querySelector('#flCard').classList.contains('plain')));
     check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+  /* and now that Malaysia has one everywhere, the same clock gets a written
+     answer instead of the bare row */
+  {
+    const { page, ctx } = await open({ query: '?mode=follow', clock: '2026-10-08T17:30:00+08:00' });
+    const r = await read(page);
+    check('a written brief replaces the bare row it was derived from',
+      r.line === '先入境再去飯店' && r.steps === '入境/領行李/去飯店', `${r.line} / ${r.steps}`);
+    await ctx.close();
+  }
+  /* overlapping windows: the HSR leg runs to 11:15 because its wall is the
+     check-in desk, but at 08:30 you are on the airport train inside it */
+  {
+    const { page, ctx } = await open({ query: '?mode=follow', clock: '2026-10-08T08:30:00+08:00' });
+    check('the thing you are actually in wins over the one that contains it',
+      (await read(page)).line === '轉機捷到第二航廈', (await read(page)).line);
+    await ctx.close();
+  }
+  {
+    const { page, ctx } = await open({ query: '?mode=follow', clock: '2026-10-13T21:00:00+08:00' });
+    check('and when two start together, the narrower one wins',
+      (await read(page)).line === '入境後走到 A18', (await read(page)).line);
     await ctx.close();
   }
   {
@@ -561,7 +592,7 @@ console.log('\n── follower mode shows one order and nothing else ──');
   }
   /* the productisation test: a trip.js with no briefs at all still answers */
   {
-    const { page, ctx, errs } = await open({ trip: path.join(HERE, 'fixtures/sample.trip.js'),
+    const { page, ctx, errs } = await open({ trip: SAMPLE,
       query: '?mode=follow', clock: '2027-03-05T10:00:00+09:00' });
     const r = await read(page);
     check('a trip that has never been briefed still works in follower mode',
@@ -621,13 +652,18 @@ console.log('\n── follower mode shows one order and nothing else ──');
     const val = fn => page.evaluate(fn);
     const key = await val(() => [...document.querySelectorAll('[data-edit]')]
       .map(x => x.dataset.edit).find(k => k.includes('入境')));
-    check('an unwritten row invites one to be written', await val(() =>
+    check('a row that already says something offers to change it', await val(() =>
       [...document.querySelectorAll('[data-edit]')].find(x => x.dataset.edit.includes('入境'))
-        .textContent.includes('寫')));
+        .textContent.includes('改')));
     await page.evaluate(k => document.querySelector(`[data-edit="${k}"]`).click(), key);
     await page.waitForTimeout(300);
     check('it opens naming the row it is for', (await val(() =>
       document.querySelector('#briefFor').textContent)).includes('KUL 入境'));
+    /* editing a draft, not filling a form: what trip.js says is already in it */
+    check('and holding what the trip already says',
+      (await val(() => document.querySelector('#bfLine').value)) === '先入境再去飯店'
+      && (await val(() => document.querySelector('#bfSteps').value)) === '入境\n領行李\n去飯店',
+      await val(() => document.querySelector('#bfLine').value));
     /* the field caps it at 12, so this sets the value past the cap directly:
        the check has to hold when the input's own limit is not what stopped it */
     await page.evaluate(() => { document.querySelector('#bfLine').value = '這行字整整超過十二個字很多'; });
@@ -667,9 +703,11 @@ console.log('\n── follower mode shows one order and nothing else ──');
     await page.waitForTimeout(300);
     await page.evaluate(() => document.querySelector('#bfClear').click());
     await page.waitForTimeout(350);
-    check('clearing returns the row to what the itinerary says', await val(() =>
-      [...document.querySelectorAll('[data-edit]')].find(x => x.dataset.edit.includes('入境'))
-        .textContent.includes('寫')));
+    /* the override goes; what trip.js says comes back */
+    await page.evaluate(k => document.querySelector(`[data-peek="${k}"]`).click(), key);
+    await page.waitForTimeout(350);
+    check('clearing returns the row to what the itinerary says',
+      (await read(page)).line === '先入境再去飯店', (await read(page)).line);
     check('no errors', !errs.length, errs[0] || '');
     await ctx.close();
   }
@@ -680,8 +718,21 @@ console.log('\n── follower mode shows one order and nothing else ──');
       context: { permissions: ['clipboard-read', 'clipboard-write'] } });
     const val = fn => page.evaluate(fn);
     await page.click('#draftAllBtn'); await page.waitForTimeout(300);
-    check('it offers to draft exactly the rows nobody has written',
-      (await val(() => document.querySelector('#dfFor').textContent)).startsWith('5 個'),
+    /* Malaysia has a brief on every timed row now, so there is nothing left
+       to draft — and saying so is the right answer, not a dead button */
+    check('with nothing left unwritten it says so rather than opening empty',
+      (await val(() => document.querySelector('#toast').textContent)).includes('寫過或檢查過'),
+      await val(() => document.querySelector('#toast').textContent));
+    await ctx.close();
+  }
+  {
+    const { page, ctx, errs } = await open({ trip: SAMPLE, clock: '2027-03-01T10:00:00+09:00',
+      context: { permissions: ['clipboard-read', 'clipboard-write'] } });
+    const val = fn => page.evaluate(fn);
+    const NRT = '0|09:00–13:10|台北 TPE → 東京 NRT';
+    await page.click('#draftAllBtn'); await page.waitForTimeout(300);
+    check('a trip with nothing written offers every timed row',
+      (await val(() => document.querySelector('#dfFor').textContent)).startsWith('3 個'),
       await val(() => document.querySelector('#dfFor').textContent));
     await page.click('#dfCopy'); await page.waitForTimeout(300);
     const prompt = await val(() => navigator.clipboard.readText());
@@ -703,15 +754,14 @@ console.log('\n── follower mode shows one order and nothing else ──');
     check('the rules are numbered without the sub-items taking numbers',
       /\d+\. \*\*只能用下面提供的資料/.test(prompt) && !/\d+\. 　/.test(prompt)
       && /\n　a\. /.test(prompt));
-    check('and the real keys it expects back',
-      prompt.includes('0|16:10–約19:00|KUL 入境、領行李 → Hotel Royal Signature'));
-    check('and the trip, not a different one', prompt.includes('馬來西亞'));
+    check('and the real keys it expects back', prompt.includes(NRT));
+    check('and the trip, not a different one',
+      prompt.includes('東京') && !prompt.includes('馬來西亞'));
 
-    const KUL = '0|16:10–約19:00|KUL 入境、領行李 → Hotel Royal Signature';
     /* a model will go over twelve characters; the limit is the whole reason
        the screen works, so nothing over it may be stored */
     await page.fill('#dfPaste', '```json\n' + JSON.stringify({
-      [KUL]: { line: '這一句話整整超過了十二個字的上限', because: 'x', steps: ['a','b','c','d','e'], need: '', fallback: '' },
+      [NRT]: { line: '這一句話整整超過了十二個字的上限', because: 'x', steps: ['a','b','c','d','e'], need: '', fallback: '' },
       'nope|x|y': { line: '短', because: '', steps: [], need: '', fallback: '' },
     }) + '\n```');
     await page.click('#dfApply'); await page.waitForTimeout(400);
@@ -719,21 +769,21 @@ console.log('\n── follower mode shows one order and nothing else ──');
     check('an over-long line is refused, and the reason names it', said.includes('16 字'), said.slice(0, 80));
     check('too many steps are refused too', said.includes('5 個步驟'));
     check('a key it invented is skipped', said.includes('不認得的項目 1 個'));
-    check('and nothing at all was stored', (await val(() => localStorage.getItem('my2026.briefs.v1'))) === null);
+    check('and nothing at all was stored', (await val(() => localStorage.getItem('sample.briefs.v1'))) === null);
 
     /* the prompt asks for ten characters a step, so the gate has to mean it */
     await page.fill('#dfPaste', JSON.stringify({
-      [KUL]: { line: '入境後去飯店', because: 'x', steps: ['入境之後先去領行李再排隊'], need: '', fallback: '' },
+      [NRT]: { line: '先辦好報到', because: 'x', steps: ['到第一航廈之後先去報到'], need: '', fallback: '' },
     }));
     await page.click('#dfApply'); await page.waitForTimeout(400);
     check('a step longer than the prompt asked for is refused too',
-      (await val(() => document.querySelector('#dfResult').textContent)).includes('12 字，超過 10')
-      && (await val(() => localStorage.getItem('my2026.briefs.v1'))) === null,
+      (await val(() => document.querySelector('#dfResult').textContent)).includes('11 字，超過 10')
+      && (await val(() => localStorage.getItem('sample.briefs.v1'))) === null,
       (await val(() => document.querySelector('#dfResult').textContent)).slice(0, 90));
 
     /* an outright restatement of the line is refused outright */
     await page.fill('#dfPaste', JSON.stringify({
-      [KUL]: { line: '入境後去飯店', because: 'x', steps: ['入境'], need: '', fallback: '入境後去飯店就好' },
+      [NRT]: { line: '先辦好報到', because: 'x', steps: ['入境'], need: '', fallback: '先辦好報到再說' },
     }));
     await page.click('#dfApply'); await page.waitForTimeout(400);
     check('a fallback that is just the line again is refused',
@@ -742,7 +792,7 @@ console.log('\n── follower mode shows one order and nothing else ──');
     /* a paraphrase is not certain enough to refuse, so it is applied and
        pointed at — the real case from a real draft */
     await page.fill('#dfPaste', JSON.stringify({
-      [KUL]: { line: '往第二航廈集合', because: 'x', steps: ['入境'], need: '', fallback: '直接往第二航廈前進' },
+      [NRT]: { line: '往第二航廈集合', because: 'x', steps: ['入境'], need: '', fallback: '直接往第二航廈前進' },
     }));
     await page.click('#dfApply'); await page.waitForTimeout(400);
     const echoed = await val(() => document.querySelector('#dfResult').textContent);
@@ -750,7 +800,7 @@ console.log('\n── follower mode shows one order and nothing else ──');
       echoed.includes('已套用 1 個') && echoed.includes('換句話說'), echoed.slice(0, 60));
 
     await page.fill('#dfPaste', JSON.stringify({
-      [KUL]: { line: '入境後去飯店', because: '排隊加領行李要抓 1.5–2.5 小時。', steps: ['入境','領行李','去飯店'],
+      [NRT]: { line: '先辦好報到', because: '第一航廈報到。', steps: ['報到','安檢','登機門'],
         need: '', fallback: '行李沒出來就去 baggage claim 櫃檯問。' },
     }));
     await page.click('#dfApply'); await page.waitForTimeout(400);
@@ -761,34 +811,34 @@ console.log('\n── follower mode shows one order and nothing else ──');
     await page.click('#closeDraft'); await page.waitForTimeout(300);
     check('the row says out loud that nobody has checked it',
       (await val(() => document.querySelectorAll('.ai-flag').length)) === 1);
-    await page.evaluate(() => document.querySelector('[data-peek*="入境、領行李"]').click());
+    await page.evaluate(() => document.querySelector('[data-peek*="東京 NRT"]').click());
     await page.waitForTimeout(400);
     check('and follower mode uses it like any written brief',
-      (await read(page)).steps === '入境/領行李/去飯店');
+      (await read(page)).steps === '報到/安檢/登機門');
     await page.click('#flExit'); await page.waitForTimeout(250);
     /* the flag is a claim about human attention, so reading it must clear it */
-    await page.evaluate(() => document.querySelector('[data-edit*="入境、領行李"]').click());
+    await page.evaluate(() => document.querySelector('[data-edit*="東京 NRT"]').click());
     await page.waitForTimeout(350);
-    await page.fill('#bfLine', '入境後直接去飯店');
+    await page.fill('#bfLine', '直接去第一航廈');
     await page.evaluate(() => document.querySelector('#briefForm button[value=default]').click());
     await page.waitForTimeout(400);
     check('once a person has edited it, it stops being an AI draft',
       (await val(() => document.querySelectorAll('.ai-flag').length)) === 0
-      && (await val(() => JSON.parse(localStorage.getItem('my2026.briefs.v1'))[
-        '0|16:10–約19:00|KUL 入境、領行李 → Hotel Royal Signature'].by)) === 'me');
+      && (await val(() => JSON.parse(localStorage.getItem('sample.briefs.v1'))[
+        '0|09:00–13:10|台北 TPE → 東京 NRT'].by)) === 'me');
     check('no errors', !errs.length, errs[0] || '');
     await ctx.close();
   }
   /* applying is a bulk write, so it has to come back in one move — and
      drafting again has to stay possible, or one apply ends the experiment */
   {
-    const { page, ctx, errs } = await open({ clock: '2026-09-17T14:00:00+08:00' });
+    const { page, ctx, errs } = await open({ trip: SAMPLE, clock: '2027-03-01T10:00:00+09:00' });
     const val = fn => page.evaluate(fn);
-    const KUL = '0|16:10–約19:00|KUL 入境、領行李 → Hotel Royal Signature';
-    const CHECKOUT = '2|12:00|Hotel Royal Signature 退房／寄放行李';
+    const KUL = '0|09:00–13:10|台北 TPE → 東京 NRT';
+    const CHECKOUT = '2|14:00|新宿 → 成田機場';
     const draft = JSON.stringify({
-      [KUL]: { line: '入境後去飯店', because: 'a', steps: ['入境'], need: '', fallback: '' },
-      [CHECKOUT]: { line: '退房寄行李', because: 'b', steps: ['退房'], need: '', fallback: '' },
+      [KUL]: { line: '先辦好報到', because: 'a', steps: ['入境'], need: '', fallback: '' },
+      [CHECKOUT]: { line: '搭車去成田', because: 'b', steps: ['退房'], need: '', fallback: '' },
     });
     await page.click('#draftAllBtn'); await page.waitForTimeout(300);
     await page.fill('#dfPaste', draft);
@@ -796,7 +846,7 @@ console.log('\n── follower mode shows one order and nothing else ──');
     check('after applying, undo is offered', await val(() => !document.querySelector('#dfUndo').hidden));
     await page.click('#dfUndo'); await page.waitForTimeout(400);
     check('and it puts everything back in one move',
-      (await val(() => localStorage.getItem('my2026.briefs.v1'))) === '{}'
+      (await val(() => localStorage.getItem('sample.briefs.v1'))) === '{}'
       && (await val(() => document.querySelectorAll('.ai-flag').length)) === 0);
 
     await page.fill('#dfPaste', draft);
@@ -804,15 +854,15 @@ console.log('\n── follower mode shows one order and nothing else ──');
     await page.click('#closeDraft'); await page.waitForTimeout(250);
     await page.click('#draftAllBtn'); await page.waitForTimeout(350);
     check('an unchecked draft still counts as unwritten, so it can be redrafted',
-      (await val(() => document.querySelector('#dfFor').textContent)).startsWith('5 個'),
+      (await val(() => document.querySelector('#dfFor').textContent)).startsWith('3 個'),
       await val(() => document.querySelector('#dfFor').textContent));
 
     /* clearing is the way back for drafts applied in an earlier session, and
        it must not touch anything a person has already read */
     await page.evaluate(k => {
-      const all = JSON.parse(localStorage.getItem('my2026.briefs.v1'));
+      const all = JSON.parse(localStorage.getItem('sample.briefs.v1'));
       all[k] = { ...all[k], line: '我改過的', by: 'me' };
-      localStorage.setItem('my2026.briefs.v1', JSON.stringify(all));
+      localStorage.setItem('sample.briefs.v1', JSON.stringify(all));
     }, CHECKOUT);
     await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForTimeout(800);
     await page.click('#draftAllBtn'); await page.waitForTimeout(350);
@@ -820,14 +870,14 @@ console.log('\n── follower mode shows one order and nothing else ──');
       (await val(() => document.querySelector('#dfClearAi').textContent)).includes('1 筆'),
       await val(() => document.querySelector('#dfClearAi').textContent));
     await page.click('#dfClearAi'); await page.waitForTimeout(450);
-    const left = JSON.parse(await val(() => localStorage.getItem('my2026.briefs.v1')));
+    const left = JSON.parse(await val(() => localStorage.getItem('sample.briefs.v1')));
     check('clearing keeps what a person checked and drops what they did not',
       Object.keys(left).length === 1 && left[CHECKOUT].line === '我改過的', JSON.stringify(Object.keys(left)));
     check('no errors', !errs.length, errs[0] || '');
     await ctx.close();
   }
   {
-    const { page, ctx } = await open({ clock: '2026-09-17T14:00:00+08:00' });
+    const { page, ctx } = await open({ trip: SAMPLE, clock: '2027-03-01T10:00:00+09:00' });
     await page.click('#draftAllBtn'); await page.waitForTimeout(300);
     await page.click('#dfApply'); await page.waitForTimeout(200);
     check('pasting nothing is told what is wrong, not ignored',
@@ -842,7 +892,7 @@ console.log('\n── follower mode shows one order and nothing else ──');
     ['steps that are not strings', '{"0|16:10–約19:00|KUL 入境、領行李 → Hotel Royal Signature":{"steps":[1,null,{}]}}'],
   ]) {
     const { page, ctx, errs } = await open({ query: '?mode=follow', clock: '2026-10-08T17:30:00+08:00',
-      seed: `localStorage.setItem('my2026.briefs.v1', ${JSON.stringify(value)})` });
+      seed: `localStorage.setItem('sample.briefs.v1', ${JSON.stringify(value)})` });
     check(`a written brief stored as ${label} does not take the screen down`,
       !!(await read(page)).line && !errs.length, errs[0] || '');
     await ctx.close();
@@ -921,7 +971,7 @@ console.log('\n── the app carries no knowledge of one particular trip ──
 {
   /* a different country, currency, party size, time zone and vocabulary,
      served in place of trip.js with no change to app.js */
-  const { page, ctx, errs } = await open({ trip: path.join(HERE, 'fixtures/sample.trip.js'),
+  const { page, ctx, errs } = await open({ trip: SAMPLE,
     clock: '2027-03-05T06:00:00+09:00' });
   const seen = await page.evaluate(() => ({
     title: document.title,

@@ -525,8 +525,15 @@ function saveBriefs(v){
 function entries(){
   const mine=getBriefs();
   return trip.days.flatMap((d,day)=>d.events.map(e=>{
-    const base=e.brief||derive(e,d.date);
-    if(!base) return null;
+    /* A written brief may leave out its window: the event's own time string
+       already holds it, and restating it is just a chance for the two to
+       disagree. A window is only authored when it carries labels nothing can
+       derive — 落地, 起飛, 櫃檯關閉. */
+    const auto=derive(e,d.date);
+    const base=e.brief
+      ? (e.brief.window?e.brief:auto&&{...e.brief,window:auto.window})
+      : auto;
+    if(!base||!base.window) return null;
     const own=mine[rowKey(e,day)];
     /* an override replaces only the fields it fills; the window is never its
        business, so the two can never drift apart */
@@ -560,7 +567,17 @@ function now(){ return previewAt??Date.now(); }
 /* what the screen should be showing at this moment */
 function followState(t=now()){
   const all=entries();
-  const item=all.find(x=>x.to>t);
+  /* Windows overlap: the HSR leg runs 06:40–11:15 because its wall is the
+     check-in desk, but at 08:30 you are on the airport train, which has a
+     window of its own. Among the things happening right now, the one that
+     started most recently is the one you are actually in — and entries are
+     sorted by start, so that is the last of them. */
+  const live=all.filter(x=>x.from<=t&&x.to>t)
+    .sort((a,b)=>(a.from-b.from)||(b.to-a.to));
+  /* and when two start together — the 22:05 train's window opens at landing,
+     same as the transfer inside it — the narrower one is the more precise
+     answer, so it sorts last */
+  const item=live.length?live[live.length-1]:all.find(x=>x.to>t);
   if(!item) return {kind:'done'};
   const today=todayISO();
   /* before the trip, say so with the number of days — not "沒有要趕的事",
