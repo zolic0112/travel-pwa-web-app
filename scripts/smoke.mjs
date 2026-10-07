@@ -342,8 +342,11 @@ console.log('\n── to-do ticks belong to items, not to positions ──');
   const val = fn => page.evaluate(fn);
   await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
 
+  /* which ids those positions hold is the trip's business, not this test's —
+     naming them meant reordering the list broke a test about migration */
+  const expect = await val(() => [0, 2, 5].map(i => window.TRIP.todos[i].id).sort().join(','));
   check('old index-keyed ticks migrate to ids', (await val(() =>
-    Object.keys(JSON.parse(localStorage.getItem('my2026.todos'))).sort().join(','))) === 't1,t3,t6');
+    Object.keys(JSON.parse(localStorage.getItem('my2026.todos'))).sort().join(','))) === expect, expect);
   check('and land on the same three items', (await val(() =>
     [...document.querySelectorAll('#todoList input')].map((c, i) => c.checked ? i : null)
       .filter(x => x !== null).join(','))) === '0,2,5');
@@ -991,14 +994,16 @@ console.log('\n── the prep list is generated the same way the briefs are ─
 {
   const PREP = JSON.stringify([
     { due: '出發前7天', title: '確認護照效期至少 6 個月', why: '效期不足會被拒絕登機', priority: '高', note: '' },
-    { due: '出發前3天', title: '換好馬幣現金小鈔', why: '小攤只收現金', priority: '高', note: '' },
+    { due: '出發前3天', title: '買好轉換插頭的備品', why: '壞了沒得買', priority: '中', note: '' },
   ]);
   const { page, ctx, errs } = await open({ clock: '2026-09-17T14:00:00+08:00',
     context: { permissions: ['clipboard-read', 'clipboard-write'] } });
   const val = fn => page.evaluate(fn);
   await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
-  check('the shared list starts as the trip\'s own nine',
-    (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 9);
+  /* how many the trip ships with is the trip's business */
+  const BASE = await val(() => window.TRIP.todos.length);
+  check('the shared list starts as the trip\'s own',
+    (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === BASE, String(BASE));
 
   await page.evaluate(() => document.querySelector('#prepDraftBtn').click());
   await page.waitForTimeout(300);
@@ -1011,6 +1016,9 @@ console.log('\n── the prep list is generated the same way the briefs are ─
   const prompt = await val(() => navigator.clipboard.readText());
   check('the prompt carries the trip and the list it already has',
     prompt.includes('馬來西亞') && prompt.includes('全員托運行李秤重 ≤20kg'));
+  /* the list is meant to be worked through, so it has to arrive in order */
+  check('and the items in the order they are to be done',
+    prompt.indexOf('護照效期與個資頁備份') < prompt.indexOf('07:15–07:30 離開 Hilton Kuching'));
   check('and tells it not to pad the list with the obvious', prompt.includes('廢話不要寫'));
 
   /* the same gate shape the briefs use: over a limit means that item is not
@@ -1033,10 +1041,10 @@ console.log('\n── the prep list is generated the same way the briefs are ─
   await page.evaluate(() => document.querySelector('#closeDraft').click());
   await page.waitForTimeout(300);
   check('the generated items join the shared list and say nobody checked them',
-    (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 11
+    (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === BASE + 2
     && (await val(() => document.querySelectorAll('#todoList .ai-flag').length)) === 2);
   check('and the progress ring counts them', (await val(() =>
-    document.querySelector('#todoProgressText').textContent)).includes('/ 11'));
+    document.querySelector('#todoProgressText').textContent)).includes(`/ ${BASE + 2}`));
 
   /* D7 again, in a new shape: a generated id is a hash of its own title, so
      regenerating cannot slide somebody's tick onto a different item */
@@ -1054,17 +1062,17 @@ console.log('\n── the prep list is generated the same way the briefs are ─
   check('and the tick is still on the item it was put on',
     (await val(() => { const w = [...document.querySelectorAll('#todoList .todo-wrap')]
       .find(x => x.textContent.includes('護照')); return w.querySelector('input').checked; }))
-    && (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 11);
+    && (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === BASE + 2);
 
   /* every delete in this app has an undo */
   await page.evaluate(() => [...document.querySelectorAll('.del-prep')]
-    .find(b => b.closest('.todo-wrap').textContent.includes('現金')).click());
+    .find(b => b.closest('.todo-wrap').textContent.includes('轉換插頭')).click());
   await page.waitForTimeout(350);
   check('a generated item can be dropped',
-    (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 10);
+    (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === BASE + 1);
   await page.evaluate(() => [...document.querySelectorAll('#toast button')].forEach(b => b.click()));
   await page.waitForTimeout(350);
-  check('and brought back', (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 11);
+  check('and brought back', (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === BASE + 2);
 
   await page.evaluate(() => document.querySelector('#prepDraftBtn').click());
   await page.waitForTimeout(300);
@@ -1074,7 +1082,7 @@ console.log('\n── the prep list is generated the same way the briefs are ─
   await page.evaluate(() => document.querySelector('#closeDraft').click());
   await page.waitForTimeout(300);
   check('and clearing returns the list to the trip\'s own',
-    (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 9);
+    (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === BASE);
   check('no errors', !errs.length, errs[0] || '');
   await ctx.close();
 }
@@ -1088,7 +1096,8 @@ for (const [label, value] of [
     seed: `localStorage.setItem('my2026.prep.v1', ${JSON.stringify(value)})` });
   await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
   check(`a prep list stored as ${label} does not take the page down`,
-    (await page.evaluate(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 9 && !errs.length,
+    (await page.evaluate(() => document.querySelectorAll('#todoList .todo-wrap').length))
+      === (await page.evaluate(() => window.TRIP.todos.length)) && !errs.length,
     errs[0] || '');
   await ctx.close();
 }

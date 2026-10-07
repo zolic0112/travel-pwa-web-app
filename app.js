@@ -257,7 +257,9 @@ function sharedRow(t,state,isNext){
     <label class="todo ${state[t.id]?'done':''} ${isNext?'next-up':''}">
     <input type="checkbox" data-id="${escapeHtml(t.id)}" ${state[t.id]?'checked':''}><span class="check"></span>
     <div class="todo-body">
-      <div class="todo-top"><span class="due">${escapeHtml(t.due)}</span><span class="pri-chip ${t.priority==='高'?'high':''}">${escapeHtml(t.priority)}優先</span></div>
+      <!-- the 到期 lives in the heading above the run; repeating it on every
+           row was the noise the grouping was meant to remove -->
+      <div class="todo-top"><span class="pri-chip ${t.priority==='高'?'high':''}">${escapeHtml(t.priority)}優先</span></div>
       <h3>${escapeHtml(t.title)}</h3>
       <p>${escapeHtml(t.why)}${t.note?` · ${escapeHtml(t.note)}`:''}</p>
       ${drafted?'<p class="ai-flag">AI 起草，還沒有人檢查</p>':''}
@@ -279,7 +281,17 @@ function renderTodos(){
   const state=getTodoState();
   const shared=allTodos();
   const next=shared.find(t=>!state[t.id]);
-  $('#todoList').innerHTML=shared.map(t=>sharedRow(t,state,t===next)).join('');
+  /* A list you work through top to bottom reads as a wall when the same 到期
+     repeats nine times. One heading per run of items sharing a 到期 turns it
+     back into a sequence: today's block, tonight's block, the morning's. */
+  let last=null;
+  $('#todoList').innerHTML=shared.map(t=>{
+    const head=t.due!==last
+      ? `<h3 class="todo-when">${escapeHtml(t.due)}<span>${shared.filter(x=>x.due===t.due).filter(x=>state[x.id]).length}/${shared.filter(x=>x.due===t.due).length}</span></h3>`
+      : '';
+    last=t.due;
+    return head+sharedRow(t,state,t===next);
+  }).join('');
 
   const mine=getMine();
   $('#mineList').innerHTML=mine.map(mineRow).join('');
