@@ -483,7 +483,13 @@ function windowOf(e,date){
   const m=[...String(e.time||'').matchAll(HHMM)];
   if(!m.length) return null;                       /* 全天, 住宿: no clock, no order */
   const from=at(date,m[0][1],m[0][2]);
-  let to=m[1]?at(date,m[1][1],m[1][2]):from+DERIVED_MIN*60000;
+  /* 「18:00 之後」 means the rest of the evening, not one hour of it. Giving
+     it the default hour quietly expired it at 19:00 and the screen fell back
+     to 「沒有要趕的事」 while the thing was still the thing to do. */
+  const openEnded=/之後|以後|起$/.test(String(e.time||''));
+  let to=m[1]?at(date,m[1][1],m[1][2])
+    :openEnded?at(date,23,'59')
+    :from+DERIVED_MIN*60000;
   if(to<=from) to+=864e5;                          /* 22:05 → 00:30 is the next day */
   return {from,to};
 }

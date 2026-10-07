@@ -529,11 +529,14 @@ console.log('\n── follower mode shows one order and nothing else ──');
     check(`${clock.slice(11, 16)} reads as 「${want}」`, (await read(page)).kicker === want, (await read(page)).kicker);
     await ctx.close();
   }
+  /* Malaysia has something on every day now, so the free-day state lives on
+     the fixture — which is where it belongs anyway, since 全天 with nothing
+     timed under it is the shape every unplanned day starts in */
   {
-    const { page, ctx } = await open({ seed: follow, clock: '2026-10-11T10:20:00+08:00' });
+    const { page, ctx } = await open({ trip: SAMPLE, query: '?mode=follow', clock: '2027-03-06T10:00:00+09:00' });
     const r = await read(page);
     check('a free day says so and points at the next thing', r.calm && r.line === '沒有要趕的事'
-      && (await page.evaluate(() => document.querySelector('#flBecause').textContent)).includes('10/13'), r.line);
+      && (await page.evaluate(() => document.querySelector('#flBecause').textContent)).includes('03/07'), r.line);
     await ctx.close();
   }
   {
@@ -569,6 +572,16 @@ console.log('\n── follower mode shows one order and nothing else ──');
       r.line === '先入境再去飯店' && r.steps === '入境/領行李/去飯店', `${r.line} / ${r.steps}`);
     await ctx.close();
   }
+  /* 「18:00 之後」 is the rest of the evening, not one hour of it — with the
+     default hour it expired at 19:00 and the screen went quiet while the
+     thing was still the thing to do */
+  {
+    const { page, ctx } = await open({ query: '?mode=follow', clock: '2026-10-12T21:30:00+08:00' });
+    const r = await read(page);
+    check('an open-ended time runs to the end of the day, not for an hour',
+      r.line === '今晚先收好行李' && !r.calm, `${r.line}${r.calm ? ' (calm)' : ''}`);
+    await ctx.close();
+  }
   /* overlapping windows: the HSR leg runs to 11:15 because its wall is the
      check-in desk, but at 08:30 you are on the airport train inside it */
   {
@@ -584,9 +597,9 @@ console.log('\n── follower mode shows one order and nothing else ──');
     await ctx.close();
   }
   {
-    const { page, ctx } = await open({ query: '?mode=follow', clock: '2026-10-09T10:00:00+08:00' });
+    const { page, ctx } = await open({ trip: SAMPLE, query: '?mode=follow', clock: '2027-03-06T10:00:00+09:00' });
     check('a free day points at the real next thing, not the next written one',
-      (await page.evaluate(() => document.querySelector('#flBecause').textContent)).includes('10/10 12:00'),
+      (await page.evaluate(() => document.querySelector('#flBecause').textContent)).includes('03/07 14:00'),
       await page.evaluate(() => document.querySelector('#flBecause').textContent));
     await ctx.close();
   }
@@ -613,9 +626,16 @@ console.log('\n── follower mode shows one order and nothing else ──');
     await ctx.close();
   }
   {
-    const { page, ctx } = await open({ query: '?mode=follow', clock: '2026-10-11T10:20:00+08:00' });
+    const { page, ctx } = await open({ trip: SAMPLE, query: '?mode=follow', clock: '2027-03-06T10:20:00+09:00' });
     check('a free day in the middle of the trip is still a free day, not a countdown',
       (await read(page)).line === '沒有要趕的事');
+    await ctx.close();
+  }
+  /* and the trip it was taken from has no quiet day left in it */
+  {
+    const { page, ctx } = await open({ query: '?mode=follow', clock: '2026-10-11T10:20:00+08:00' });
+    check('every day of this trip now answers with something to do',
+      (await read(page)).line !== '沒有要趕的事', (await read(page)).line);
     await ctx.close();
   }
   /* the answer to "I want to tap a row and see it": every row with a clock
