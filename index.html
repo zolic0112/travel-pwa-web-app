@@ -143,6 +143,7 @@
           <button id="resetTodos" class="btn quiet">重設</button>
         </div>
         <div id="todoList" class="stack grouped"></div>
+        <button id="prepDraftBtn" class="btn quiet prep-gen" type="button">用 AI 生成行前準備清單</button>
       </div>
 
       <div class="pane" id="paneMine" role="tabpanel" aria-labelledby="segMine" hidden>
@@ -293,14 +294,12 @@
        Claude, the JSON comes back through the same validator the editor
        uses. No key in this page, nothing sent anywhere. -->
   <dialog id="draftDialog">
-    <div class="dialog-head"><h2>用 AI 起草跟隊內容</h2><button type="button" id="closeDraft" aria-label="關閉">×</button></div>
+    <div class="dialog-head"><h2 id="draftTitle">用 AI 起草</h2><button type="button" id="closeDraft" aria-label="關閉">×</button></div>
     <p class="dialog-hint" id="dfFor"></p>
     <div class="form-grid">
-      <ol class="steps-list full">
-        <li>按「複製 prompt」，貼給 Claude（或任何你在用的 AI）。</li>
-        <li>把它回的 JSON 整段貼到下面，按「套用」。</li>
-        <li>套用進來的內容會標成「AI 起草」。<b>請逐一打開確認</b> —— 這些字是要給人在機場照著做的。</li>
-      </ol>
+      <!-- the dialog knows nothing about what is being generated: the
+           generator supplies its own title and its own three steps -->
+      <ol class="steps-list full" id="dfHow"></ol>
       <div class="full"><button type="button" class="btn primary" id="dfCopy">複製 prompt</button></div>
       <label class="full">把 AI 回的 JSON 貼在這裡<textarea id="dfPaste" rows="6"
         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea></label>

@@ -169,6 +169,49 @@ function setDay(v){
    Two lists, not one flag per item: the trip's own checklist, which
    everyone sees the same, and whatever you add for yourself. Choosing
    where a thing goes beats a share switch on every row. */
+/* trim a stored string to a sane length, whatever it claims to be */
+const str=(v,n)=>typeof v==='string'?v.slice(0,n):'';
+
+/* ── 行前準備清單：AI 生成的部分 ──────────────────────────
+   trip.js 的 todos 是這趟旅行自己的清單，跟著部署走。生成出來的項目住在
+   這裡，疊在它上面，標成「AI 起草」直到有人看過。和跟隊內容是同一套規矩。
+
+   id 是從標題算出來的，不是流水號。勾選狀態 key 在 id 上（見 D7），所以
+   重新生成一次如果用流水號，別人已經勾好的項目會整個錯位 —— 那正是當初
+   用陣列位置當 key 踩過的那個坑，換個形式而已。 */
+const prepKey=ns('prep.v1');
+const PREP_MAX={due:14,title:30,why:24,note:60};
+const PRIORITIES=['高','中','低'];
+function prepId(title){
+  /* a small stable hash: the same wording keeps its tick across a regenerate */
+  let h=0;
+  for(const ch of String(title)) h=(h*31+ch.codePointAt(0))>>>0;
+  return 'g'+h.toString(36);
+}
+function getPrep(){
+  let v=null;
+  try{ v=JSON.parse(localStorage.getItem(prepKey)); }catch{}
+  if(!Array.isArray(v)) return [];
+  const seen=new Set();
+  return v.filter(x=>x&&typeof x==='object'&&!Array.isArray(x)&&typeof x.title==='string'&&x.title.trim())
+    .map(x=>({
+      id:typeof x.id==='string'&&x.id?x.id:prepId(x.title),
+      due:str(x.due,PREP_MAX.due)||'出發前',
+      title:str(x.title,PREP_MAX.title),
+      why:str(x.why,PREP_MAX.why),
+      priority:PRIORITIES.includes(x.priority)?x.priority:'中',
+      note:str(x.note,PREP_MAX.note),
+      by:x.by==='ai'?'ai':'me',
+    }))
+    .filter(x=>{ if(seen.has(x.id)) return false; seen.add(x.id); return true; });
+}
+function savePrep(list){
+  try{ localStorage.setItem(prepKey,JSON.stringify(list)); return true; }
+  catch{ toast('無法儲存，裝置儲存空間已滿'); return false; }
+}
+/* the shared list is the trip's own plus whatever has been generated on top */
+function allTodos(){ return [...trip.todos,...getPrep()]; }
+
 const todoKey=ns('todos');
 const mineKey=ns('todos.mine.v1');
 
@@ -209,13 +252,18 @@ function saveMine(list){
 }
 
 function sharedRow(t,state,isNext){
-  return `<label class="todo ${state[t.id]?'done':''} ${isNext?'next-up':''}">
+  const drafted=t.by==='ai';
+  return `<div class="todo-wrap${drafted?' drafted':''}">
+    <label class="todo ${state[t.id]?'done':''} ${isNext?'next-up':''}">
     <input type="checkbox" data-id="${escapeHtml(t.id)}" ${state[t.id]?'checked':''}><span class="check"></span>
     <div class="todo-body">
       <div class="todo-top"><span class="due">${escapeHtml(t.due)}</span><span class="pri-chip ${t.priority==='高'?'high':''}">${escapeHtml(t.priority)}優先</span></div>
       <h3>${escapeHtml(t.title)}</h3>
       <p>${escapeHtml(t.why)}${t.note?` · ${escapeHtml(t.note)}`:''}</p>
-    </div></label>`;
+      ${drafted?'<p class="ai-flag">AI 起草，還沒有人檢查</p>':''}
+    </div></label>
+    ${t.by!==undefined?`<button class="icon-btn del-prep" data-id="${escapeHtml(t.id)}" type="button" aria-label="刪除「${escapeHtml(t.title)}」">×</button>`:''}
+  </div>`;
 }
 function mineRow(m){
   return `<div class="todo mine ${m.done?'done':''}">
@@ -229,8 +277,9 @@ function mineRow(m){
 
 function renderTodos(){
   const state=getTodoState();
-  const next=trip.todos.find(t=>!state[t.id]);
-  $('#todoList').innerHTML=trip.todos.map(t=>sharedRow(t,state,t===next)).join('');
+  const shared=allTodos();
+  const next=shared.find(t=>!state[t.id]);
+  $('#todoList').innerHTML=shared.map(t=>sharedRow(t,state,t===next)).join('');
 
   const mine=getMine();
   $('#mineList').innerHTML=mine.map(mineRow).join('');
@@ -245,6 +294,13 @@ function renderTodos(){
   $$('#mineList input').forEach(cb=>cb.addEventListener('change',()=>{
     saveMine(getMine().map(m=>m.id===cb.dataset.mine?{...m,done:cb.checked}:m));
   }));
+  $$('.del-prep').forEach(b=>b.onclick=()=>{
+    const list=getPrep(), gone=list.find(p=>p.id===b.dataset.id);
+    if(!gone) return;
+    if(!savePrep(list.filter(p=>p.id!==gone.id))) return;
+    renderTodos();
+    toast('已刪除',{label:'復原',fn(){ if(savePrep([...getPrep(),gone])){renderTodos();toast('已復原');} }});
+  });
   $$('.del-mine').forEach(b=>b.onclick=()=>{
     const gone=getMine().find(m=>m.id===b.dataset.id);
     if(!gone) return;
@@ -252,7 +308,7 @@ function renderTodos(){
     toast('已刪除',{label:'復原',fn(){saveMine([...getMine(),gone]);toast('已復原');}});
   });
 
-  const done=trip.todos.filter(t=>state[t.id]).length, total=trip.todos.length,
+  const done=shared.filter(t=>state[t.id]).length, total=shared.length,
         pct=total?Math.round(done/total*100):0;
   $('#sharedCount').textContent=`${done}/${total}`;
   $('#todoProgressText').textContent=`${done} / ${total} 完成`;
@@ -508,7 +564,6 @@ function derive(e,date){
    the words are overridden. Nobody fills this in from blank — the dialog
    opens holding whatever the row already says. */
 const briefKey=ns('briefs.v1');
-const str=(v,n)=>typeof v==='string'?v.slice(0,n):'';
 function getBriefs(){
   let v=null;
   try{ v=JSON.parse(localStorage.getItem(briefKey)||'{}'); }catch{}
@@ -880,10 +935,14 @@ function echoesLine(fb,line){
   if(!F.length||!L.size) return false;
   return F.filter(c=>L.has(c)).length/F.length>=ECHO;
 }
+/* a model will wrap it in a code block however firmly you ask it not to */
+function unfence(text){
+  const raw=String(text||'').trim();
+  const fence=raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  return fence?fence[1].trim():raw;
+}
 function parseDraft(text,keys){
-  let raw=text.trim();
-  const fence=raw.match(/```(?:json)?\s*([\s\S]*?)```/);   /* it will use a code block anyway */
-  if(fence) raw=fence[1].trim();
+  const raw=unfence(text);
   let v;
   try{ v=JSON.parse(raw); }
   catch{ return {err:'這段不是有效的 JSON。整段貼上，不要只貼一部分。'}; }
@@ -903,31 +962,171 @@ function parseDraft(text,keys){
   return {out,bad,unknown,weak};
 }
 
-let draftKeys=[], beforeApply=null;
+/* ── 生成器：一種「要 AI 寫什麼」就是一個項目 ──────────────
+   加一種新的生成內容，不應該要去動對話框、驗證流程或儲存邏輯。一個生成器
+   只需要回答五件事：叫什麼、要為誰生成、prompt 長怎樣、回來的東西怎麼驗、
+   驗過之後放哪裡。對話框對這些一無所知。 */
+
+function prepRules(){
+  return [
+    `到期（due）最多 ${PREP_MAX.due} 個字，寫「出發前7天」「10/12晚上」這種看得懂的時機，不要寫完整日期以外的空話。`,
+    `標題（title）最多 ${PREP_MAX.title} 個字，是一個做得完的動作。「確認護照效期」可以，「做好準備」不行。`,
+    `為什麼（why）最多 ${PREP_MAX.why} 個字，一句話講清楚不做會怎樣。`,
+    `優先（priority）只能是 ${PRIORITIES.join('、')} 其中一個。`,
+    `備註（note）最多 ${PREP_MAX.note} 個字，放具體的數字、證件名稱、對象。沒有就留空字串。`,
+    '**不要重複上面「已經有的項目」裡的事。** 那些已經在清單上了。',
+    '**只能用提供的行程資料。** 不要編造航班號碼、價格、電話、櫃檯位置。不確定就不要寫那一項。',
+    '**只寫這趟旅行真的需要的事。** 「帶護照」「訂機票」這種每個人都知道的廢話不要寫，那會把真正要注意的事淹掉。',
+    '行程裡有分開機票、轉機、托運規定、硬性截止時間的話，那些才是最值得寫的。',
+    '語氣是同行的朋友在提醒。全部用繁體中文。',
+  ].map((x,i)=>`${i+1}. ${x}`).join('\n');
+}
+function prepPrompt(){
+  const have=allTodos().map(t=>t.title);
+  return `你在幫一個旅行 app 寫「出發前準備清單」。
+
+這份清單是給整個團隊看的，出發前一項一項勾掉。每一項是一個做得完的動作，不是提醒自己「要注意」。
+
+這趟旅行：${meta.title}　${meta.subtitle||''}
+
+完整行程：
+${JSON.stringify(trip.days.map(d=>({
+  日期:d.label,
+  行程:d.events.map(e=>({時間:e.time,類型:e.type,標題:e.title,
+    ...(e.meta&&e.meta.length?{標記:e.meta}:{}),...(e.note?{備註:e.note}:{})})),
+})),null,1)}
+
+已經有的項目（不要重複）：
+${have.map(x=>`- ${x}`).join('\n')}
+
+規則：
+${prepRules()}
+
+只輸出 JSON，不要有任何其他文字、不要用程式碼區塊。格式是一個陣列：
+[{"due":"","title":"","why":"","priority":"中","note":""}]`;
+}
+function checkPrepItem(v,i){
+  const at=`第 ${i+1} 項`;
+  const bad=[];
+  if(!v||typeof v!=='object'||Array.isArray(v)) return [`${at}：不是一個物件`];
+  const t=typeof v.title==='string'?v.title.trim():'';
+  if(!t) bad.push(`${at}：沒有標題`);
+  else if([...t].length>PREP_MAX.title) bad.push(`${at}：標題 ${[...t].length} 字，超過 ${PREP_MAX.title}（「${t}」）`);
+  for(const [k,label] of [['due','到期'],['why','為什麼'],['note','備註']]){
+    const x=typeof v[k]==='string'?v[k].trim():'';
+    if(x&&[...x].length>PREP_MAX[k]) bad.push(`${at}：${label} ${[...x].length} 字，超過 ${PREP_MAX[k]}`);
+  }
+  if(v.priority!=null&&!PRIORITIES.includes(v.priority))
+    bad.push(`${at}：優先「${v.priority}」不是 ${PRIORITIES.join('、')}`);
+  return bad;
+}
+function parsePrep(text){
+  const raw=unfence(text);
+  let v;
+  try{ v=JSON.parse(raw); }
+  catch{ return {err:'這段不是有效的 JSON。整段貼上，不要只貼一部分。'}; }
+  if(!Array.isArray(v)) return {err:'最外層要是一個陣列。'};
+  const have=new Set(allTodos().map(t=>t.title.trim()));
+  const out=[], bad=[], unknown=[], weak=[];
+  v.forEach((item,i)=>{
+    const errs=checkPrepItem(item,i);
+    if(errs.length){ bad.push(...errs); return; }
+    const title=item.title.trim();
+    /* a duplicate is not an error, it is just already on the list */
+    if(have.has(title)){ unknown.push(title); return; }
+    have.add(title);
+    out.push({id:prepId(title),title,
+      due:(typeof item.due==='string'?item.due.trim():'')||'出發前',
+      why:typeof item.why==='string'?item.why.trim():'',
+      priority:PRIORITIES.includes(item.priority)?item.priority:'中',
+      note:typeof item.note==='string'?item.note.trim():'',by:'ai'});
+  });
+  return {out,bad,unknown,weak};
+}
+
+const GENERATORS={
+  briefs:{
+    label:'跟隊內容',
+    title:'用 AI 起草跟隊內容',
+    how:['按「複製 prompt」，貼給 AI。','把它回的 JSON 整段貼到下面，按「套用」。',
+         '套用進來的會標成「AI 起草」。<b>請逐一打開確認</b> —— 這些字是要給人在機場照著做的。'],
+    targets(){
+      const mine=getBriefs();
+      return entries().filter(x=>{
+        const own=mine[rowKey(x.e,x.day)];
+        return x.derived||(own&&own.by==='ai');
+      }).map(x=>rowKey(x.e,x.day));
+    },
+    none:'每個項目都有人寫過或檢查過了',
+    describe(keys){
+      return keys.length===1
+        ? entries().filter(x=>rowKey(x.e,x.day)===keys[0])
+            .map(x=>`${trip.days[x.day].label} ${x.e.time}　${x.e.title}`)[0]||''
+        : `${keys.length} 個還沒有人寫過內容的項目`;
+    },
+    prompt:draftPrompt,
+    parse:(text,keys)=>parseDraft(text,keys),
+    read:getBriefs, write:saveBriefs,
+    merge(store,out){ const next={...store}; for(const k of Object.keys(out)) next[k]={...out[k],by:'ai'}; return next; },
+    count(out){ return Object.keys(out).length; },
+    drafted(store){ return Object.values(store).filter(v=>v.by==='ai').length; },
+    strip(store){ const next={}; for(const [k,v] of Object.entries(store)) if(v.by!=='ai') next[k]=v; return next; },
+    after(){ renderTimeline(); renderFollow(); },
+  },
+  prep:{
+    label:'行前準備清單',
+    title:'用 AI 生成行前準備清單',
+    how:['按「複製 prompt」，貼給 AI（Gemini、Claude、ChatGPT 都可以）。',
+         '把它回的 JSON 整段貼到下面，按「套用」。',
+         '套用進來的會標成「AI 起草」。<b>請逐一看過</b> —— 清單是給全隊照著做的。'],
+    targets(){ return ['*']; },          /* one shot for the whole trip */
+    none:'',
+    describe(){ return `${meta.title}　已經有 ${allTodos().length} 項，生成的會加在後面`; },
+    prompt:prepPrompt,
+    parse:text=>parsePrep(text),
+    read:getPrep, write:savePrep,
+    merge(store,out){ return [...store,...out]; },
+    count(out){ return out.length; },
+    drafted(store){ return store.filter(v=>v.by==='ai').length; },
+    strip(store){ return store.filter(v=>v.by!=='ai'); },
+    after(){ renderTodos(); },
+  },
+};
+
+let draftGen='briefs', draftKeys=[], beforeApply=null;
+const gen=()=>GENERATORS[draftGen];
+
 function undoApply(){
   if(!beforeApply) return;
-  if(!saveBriefs(beforeApply)) return;
+  if(!gen().write(beforeApply)) return;
   beforeApply=null;
-  renderTimeline(); renderFollow(); refreshDraftButtons();
+  gen().after(); refreshDraftButtons();
   $('#dfUndo').hidden=true;
   $('#dfResult').textContent='已復原，回到套用之前的狀態。';
   toast('已復原');
 }
 function refreshDraftButtons(){
-  const n=Object.values(getBriefs()).filter(v=>v.by==='ai').length;
+  const n=gen().drafted(gen().read());
   $('#dfClearAi').hidden=!n;
   $('#dfClearAi').textContent=`清除 ${n} 筆 AI 起草`;
 }
-function openDraft(keys){
-  draftKeys=keys; beforeApply=null;
-  const n=keys.length;
-  $('#dfFor').textContent=n===1
-    ? entries().filter(x=>rowKey(x.e,x.day)===keys[0]).map(x=>`${trip.days[x.day].label} ${x.e.time}　${x.e.title}`)[0]||''
-    : `${n} 個還沒有人寫過內容的項目`;
+function openDraft(which,keys){
+  draftGen=which; draftKeys=keys;
+  beforeApply=null;
+  const g=gen();
+  $('#draftTitle').textContent=g.title;
+  $('#dfHow').innerHTML=g.how.map(x=>`<li>${x}</li>`).join('');
+  $('#dfFor').textContent=g.describe(keys);
   $('#dfPaste').value=''; $('#dfResult').hidden=true; $('#dfResult').textContent='';
   $('#dfUndo').hidden=true;
   refreshDraftButtons();
   $('#draftDialog').showModal();
+}
+/* open a generator for everything it has to offer, or say so if it has none */
+function openDraftAll(which){
+  const todo=GENERATORS[which].targets();
+  if(!todo.length){ toast(GENERATORS[which].none||'沒有要生成的項目'); return; }
+  openDraft(which,todo);
 }
 function setupDraft(){
   $('#closeDraft').onclick=()=>$('#draftDialog').close();
@@ -935,20 +1134,19 @@ function setupDraft(){
   /* undo only reaches back to this session's apply; this is the way out for
      drafts applied at some point in the past */
   $('#dfClearAi').onclick=()=>{
-    const before=getBriefs(), after={};
-    for(const [k,v] of Object.entries(before)) if(v.by!=='ai') after[k]=v;
-    const n=Object.keys(before).length-Object.keys(after).length;
-    if(!saveBriefs(after)) return;
-    renderTimeline(); renderFollow(); refreshDraftButtons();
+    const g=gen(), before=g.read(), after=g.strip(before);
+    const n=g.drafted(before);
+    if(!g.write(after)) return;
+    g.after(); refreshDraftButtons();
     $('#dfResult').hidden=false;
-    $('#dfResult').textContent=`已清除 ${n} 筆沒有人檢查過的 AI 起草，回到行程原本的內容。`;
+    $('#dfResult').textContent=`已清除 ${n} 筆沒有人檢查過的 AI 起草。`;
     toast(`已清除 ${n} 筆`,{label:'復原',fn(){
-      if(saveBriefs(before)){renderTimeline();renderFollow();refreshDraftButtons();toast('已復原');}
+      if(g.write(before)){g.after();refreshDraftButtons();toast('已復原');}
     }});
   };
   $('#dfCopy').onclick=async()=>{
-    const text=draftPrompt(draftKeys);
-    try{ await navigator.clipboard.writeText(text); toast('已複製，貼給 Claude'); }
+    const text=gen().prompt(draftKeys);
+    try{ await navigator.clipboard.writeText(text); toast('已複製，貼給 AI'); }
     catch{
       /* clipboard can be refused; the text still has to be reachable */
       $('#dfPaste').value=text; $('#dfPaste').select();
@@ -956,28 +1154,31 @@ function setupDraft(){
     }
   };
   $('#dfApply').onclick=()=>{
-    const r=parseDraft($('#dfPaste').value,draftKeys);
+    const g=gen();
+    const r=g.parse($('#dfPaste').value,draftKeys);
     const box=$('#dfResult'); box.hidden=false;
     if(r.err){ box.textContent=r.err; return; }
-    const got=Object.keys(r.out);
+    const n=g.count(r.out);
     const notes=[];
     if(r.bad.length) notes.push('沒有套用（不符合規則）：\n'+r.bad.join('\n'));
-    if(r.unknown.length) notes.push(`不認得的項目 ${r.unknown.length} 個，已略過。`);
+    if(r.unknown.length) notes.push(draftGen==='prep'
+      ? `${r.unknown.length} 項已經在清單上了，略過。`
+      : `不認得的項目 ${r.unknown.length} 個，已略過。`);
     if(r.weak&&r.weak.length) notes.push(
       `這 ${r.weak.length} 個的「萬一來不及」看起來只是把口令換句話說，已經套用，但那一欄是出事時才會看的，值得先確認：\n`
       +r.weak.join('\n'));
-    const missing=draftKeys.filter(k=>!got.includes(k));
-    if(missing.length) notes.push(`還有 ${missing.length} 個項目沒有內容。`);
-    if(!got.length){ box.textContent=['一個都沒有套用。',...notes].join('\n\n'); return; }
-    const snapshot=getBriefs();
-    const all=getBriefs();
-    for(const k of got) all[k]={...r.out[k],by:'ai'};
-    if(!saveBriefs(all)) return;
+    if(draftGen==='briefs'){
+      const missing=draftKeys.filter(k=>!Object.keys(r.out).includes(k));
+      if(missing.length) notes.push(`還有 ${missing.length} 個項目沒有內容。`);
+    }
+    if(!n){ box.textContent=['一個都沒有套用。',...notes].join('\n\n'); return; }
+    const snapshot=g.read();
+    if(!g.write(g.merge(snapshot,r.out))) return;
     beforeApply=snapshot; $('#dfUndo').hidden=false;
-    renderTimeline(); renderFollow(); refreshDraftButtons();
-    toast(`已套用 ${got.length} 個`,{label:'復原',fn:undoApply});
-    box.textContent=[`已套用 ${got.length} 個，全部標記成「AI 起草」。`,
-      '這些內容沒有人檢查過。請逐一打開確認，改過之後標記就會消失。',...notes].join('\n\n');
+    g.after(); refreshDraftButtons();
+    toast(`已套用 ${n} 個`,{label:'復原',fn:undoApply});
+    box.textContent=[`已套用 ${n} 個，全部標記成「AI 起草」。`,
+      '這些內容沒有人檢查過，請逐一看過，改過之後標記就會消失。',...notes].join('\n\n');
   };
 }
 
@@ -1048,19 +1249,9 @@ function setupFollow(){
   $('#flMore').onclick=()=>setFollowOpen($('#flDetail').hidden);
   setupBriefEditor();
   setupDraft();
-  $('#draftAllBtn').onclick=()=>{
-    /* a row still flagged as an unchecked AI draft counts as unwritten —
-       otherwise the first apply locks the button and there is no way to
-       try a different draft without clearing five rows by hand */
-    const mine=getBriefs();
-    const todo=entries().filter(x=>{
-      const own=mine[rowKey(x.e,x.day)];
-      return x.derived||(own&&own.by==='ai');
-    }).map(x=>rowKey(x.e,x.day));
-    if(!todo.length){ toast('每個項目都有人寫過或檢查過了'); return; }
-    openDraft(todo);
-  };
-  $('#bfDraft').onclick=()=>{ $('#briefDialog').close(); openDraft([editingKey]); };
+  $('#draftAllBtn').onclick=()=>openDraftAll('briefs');
+  $('#prepDraftBtn').onclick=()=>openDraftAll('prep');
+  $('#bfDraft').onclick=()=>{ $('#briefDialog').close(); openDraft('briefs',[editingKey]); };
 }
 
 /* ── theme ────────────────────────────────────────────────── */
