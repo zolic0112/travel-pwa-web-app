@@ -987,6 +987,218 @@ console.log('\n── follower mode shows one order and nothing else ──');
   }
 }
 
+console.log('\n── the prep list is generated the same way the briefs are ──');
+{
+  const PREP = JSON.stringify([
+    { due: '出發前7天', title: '確認護照效期至少 6 個月', why: '效期不足會被拒絕登機', priority: '高', note: '' },
+    { due: '出發前3天', title: '換好馬幣現金小鈔', why: '小攤只收現金', priority: '高', note: '' },
+  ]);
+  const { page, ctx, errs } = await open({ clock: '2026-09-17T14:00:00+08:00',
+    context: { permissions: ['clipboard-read', 'clipboard-write'] } });
+  const val = fn => page.evaluate(fn);
+  await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
+  check('the shared list starts as the trip\'s own nine',
+    (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 9);
+
+  await page.evaluate(() => document.querySelector('#prepDraftBtn').click());
+  await page.waitForTimeout(300);
+  /* the dialog is shared with the brief generator and must now say which
+     one it is showing */
+  check('the dialog titles itself for the generator that opened it',
+    (await val(() => document.querySelector('#draftTitle').textContent)).includes('行前準備清單'),
+    await val(() => document.querySelector('#draftTitle').textContent));
+  await page.click('#dfCopy'); await page.waitForTimeout(300);
+  const prompt = await val(() => navigator.clipboard.readText());
+  check('the prompt carries the trip and the list it already has',
+    prompt.includes('馬來西亞') && prompt.includes('全員托運行李秤重 ≤20kg'));
+  check('and tells it not to pad the list with the obvious', prompt.includes('廢話不要寫'));
+
+  /* the same gate shape the briefs use: over a limit means that item is not
+     applied at all, and the reason names it */
+  await page.fill('#dfPaste', JSON.stringify([
+    { due: '出發前', title: '太長的標題'.repeat(7), why: 'x', priority: '中', note: '' },
+    { due: '出發前', title: '優先錯的那一項', why: 'x', priority: '緊急', note: '' },
+    { due: '出發前', title: '全員托運行李秤重 ≤20kg', why: '重複', priority: '高', note: '' },
+  ]));
+  await page.click('#dfApply'); await page.waitForTimeout(400);
+  const said = await val(() => document.querySelector('#dfResult').textContent);
+  check('an over-long title is refused with its length', said.includes('35 字，超過 30'), said.slice(0, 70));
+  check('a priority outside 高中低 is refused', said.includes('不是 高、中、低'));
+  check('something already on the list is skipped, not duplicated', said.includes('1 項已經在清單上了'));
+  check('and nothing was stored', (await val(() => localStorage.getItem('my2026.prep.v1'))) === null);
+
+  await page.fill('#dfPaste', PREP);
+  await page.click('#dfApply'); await page.waitForTimeout(400);
+  check('a clean draft is applied', (await val(() => document.querySelector('#dfResult').textContent)).includes('已套用 2 個'));
+  await page.evaluate(() => document.querySelector('#closeDraft').click());
+  await page.waitForTimeout(300);
+  check('the generated items join the shared list and say nobody checked them',
+    (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 11
+    && (await val(() => document.querySelectorAll('#todoList .ai-flag').length)) === 2);
+  check('and the progress ring counts them', (await val(() =>
+    document.querySelector('#todoProgressText').textContent)).includes('/ 11'));
+
+  /* D7 again, in a new shape: a generated id is a hash of its own title, so
+     regenerating cannot slide somebody's tick onto a different item */
+  await page.evaluate(() => [...document.querySelectorAll('#todoList input')]
+    .find(c => c.closest('.todo-wrap').textContent.includes('護照')).click());
+  await page.waitForTimeout(300);
+  await page.evaluate(() => document.querySelector('#prepDraftBtn').click());
+  await page.waitForTimeout(300);
+  await page.fill('#dfPaste', PREP);
+  await page.click('#dfApply'); await page.waitForTimeout(400);
+  check('regenerating the same list adds nothing instead of duplicating it',
+    (await val(() => document.querySelector('#dfResult').textContent)).includes('一個都沒有套用'));
+  await page.evaluate(() => document.querySelector('#closeDraft').click());
+  await page.waitForTimeout(300);
+  check('and the tick is still on the item it was put on',
+    (await val(() => { const w = [...document.querySelectorAll('#todoList .todo-wrap')]
+      .find(x => x.textContent.includes('護照')); return w.querySelector('input').checked; }))
+    && (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 11);
+
+  /* every delete in this app has an undo */
+  await page.evaluate(() => [...document.querySelectorAll('.del-prep')]
+    .find(b => b.closest('.todo-wrap').textContent.includes('現金')).click());
+  await page.waitForTimeout(350);
+  check('a generated item can be dropped',
+    (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 10);
+  await page.evaluate(() => [...document.querySelectorAll('#toast button')].forEach(b => b.click()));
+  await page.waitForTimeout(350);
+  check('and brought back', (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 11);
+
+  await page.evaluate(() => document.querySelector('#prepDraftBtn').click());
+  await page.waitForTimeout(300);
+  check('clearing offers the count it would clear',
+    (await val(() => document.querySelector('#dfClearAi').textContent)).includes('2 筆'));
+  await page.click('#dfClearAi'); await page.waitForTimeout(400);
+  await page.evaluate(() => document.querySelector('#closeDraft').click());
+  await page.waitForTimeout(300);
+  check('and clearing returns the list to the trip\'s own',
+    (await val(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 9);
+  check('no errors', !errs.length, errs[0] || '');
+  await ctx.close();
+}
+for (const [label, value] of [
+  ['malformed JSON', '{{{'],
+  ['an object where a list belongs', '{"a":1}'],
+  ['a list of nulls', '[null,null]'],
+  ['items with no title', '[{"due":"x"}]'],
+]) {
+  const { page, ctx, errs } = await open({ clock: '2026-09-17T14:00:00+08:00',
+    seed: `localStorage.setItem('my2026.prep.v1', ${JSON.stringify(value)})` });
+  await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
+  check(`a prep list stored as ${label} does not take the page down`,
+    (await page.evaluate(() => document.querySelectorAll('#todoList .todo-wrap').length)) === 9 && !errs.length,
+    errs[0] || '');
+  await ctx.close();
+}
+
+console.log('\n── Gemini is an opt-in provider, and the key stays on the device ──');
+{
+  /* stand in for Google, with the shapes taken from its discovery document */
+  const google = (ctx, { key = 'good-key' } = {}) => ctx.route('https://generativelanguage.googleapis.com/**', route => {
+    /* `URL` is this file's base address, so parse the request the long way */
+    const href = route.request().url();
+    if (!href.includes(`key=${key}`))
+      return route.fulfill({ status: 400, contentType: 'application/json',
+        body: JSON.stringify({ error: { message: 'API key not valid. Please pass a valid API key.' } }) });
+    if (href.includes('/models?'))
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ models: [
+        { name: 'models/gemini-fake-pro', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/embed-only', supportedGenerationMethods: ['embedContent'] }] }) });
+    if (href.includes(':generateContent'))
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ candidates: [{ content: { parts: [
+        { text: JSON.stringify([{ due: '出發前7天', title: '確認護照效期', why: '效期不足會被拒載', priority: '高', note: '' }]) }] } }] }) });
+    return route.fulfill({ status: 404, body: '{}' });
+  });
+
+  {
+    const { page, ctx, errs } = await open({ clock: '2026-09-17T14:00:00+08:00' });
+    await google(ctx);
+    const val = fn => page.evaluate(fn);
+    await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('#prepDraftBtn').click());
+    await page.waitForTimeout(300);
+    check('with no key there is nothing to run, only the prompt to copy',
+      await val(() => document.querySelector('#dfRun').hidden));
+    await page.evaluate(() => document.querySelector('#closeDraft').click());
+    await page.waitForTimeout(200);
+
+    await page.evaluate(() => document.querySelector('#geminiBtn').click());
+    await page.waitForTimeout(300);
+    check('the dialog says where the key goes before anything is typed',
+      (await val(() => document.querySelector('.warn-note').textContent)).includes('這支手機'));
+    /* the key is not the only thing that leaves: so does the itinerary */
+    check('and that the trip itself is what gets sent',
+      (await val(() => [...document.querySelectorAll('.warn-note')].map(x => x.textContent).join(''))).includes('整份行程會一起送給 Google'));
+    await page.fill('#gmKey', 'bad-key');
+    await page.click('#gmLoad'); await page.waitForTimeout(600);
+    check('a key that does not work says what Google said',
+      (await val(() => document.querySelector('#gmResult').textContent)).includes('API key not valid'),
+      await val(() => document.querySelector('#gmResult').textContent));
+    /* a key that failed must not be left behind as if it had worked */
+    check('and a failed lookup stores nothing',
+      (await val(() => localStorage.getItem('my2026.gemini.key'))) === null);
+
+    await page.fill('#gmKey', 'good-key');
+    await page.click('#gmLoad'); await page.waitForTimeout(600);
+    check('a working key is asked what it can run, rather than a name being assumed',
+      (await val(() => [...document.querySelector('#gmModel').options].map(o => o.value))).join() === 'models/gemini-fake-pro',
+      (await val(() => [...document.querySelector('#gmModel').options].map(o => o.value))).join());
+    await page.evaluate(() => document.querySelector('#geminiForm button[value=default]').click());
+    await page.waitForTimeout(400);
+
+    await page.evaluate(() => document.querySelector('#prepDraftBtn').click());
+    await page.waitForTimeout(300);
+    check('now there is something to run', await val(() => !document.querySelector('#dfRun').hidden));
+    await page.click('#dfRun'); await page.waitForTimeout(800);
+    check('what comes back lands in the same box a paste would',
+      (await val(() => document.querySelector('#dfPaste').value)).includes('確認護照效期'));
+    await page.click('#dfApply'); await page.waitForTimeout(400);
+    /* the provider changes who runs the prompt, never what is allowed through */
+    check('and goes through the same gate, flagged the same way',
+      (await val(() => document.querySelector('#dfResult').textContent)).includes('已套用 1 個')
+      && (await val(() => JSON.parse(localStorage.getItem('my2026.prep.v1'))[0].by)) === 'ai');
+    await page.evaluate(() => document.querySelector('#closeDraft').click());
+    await page.waitForTimeout(200);
+
+    await page.evaluate(() => document.querySelector('#geminiBtn').click());
+    await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('#gmForget').click());
+    await page.waitForTimeout(400);
+    check('forgetting the key takes the model with it',
+      (await val(() => localStorage.getItem('my2026.gemini.key'))) === null
+      && (await val(() => localStorage.getItem('my2026.gemini.model'))) === null);
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+  /* the key is this device's; a follower opening the shared link has none */
+  {
+    const { page, ctx } = await open({ query: '?mode=follow', clock: '2026-09-17T14:00:00+08:00' });
+    check('the link handed to the group carries no key',
+      (await page.evaluate(() => localStorage.getItem('my2026.gemini.key'))) === null
+      && !(await page.evaluate(() => location.search)).includes('key'));
+    await ctx.close();
+  }
+  /* an outage is not a dead end: the copy-and-paste route is still there */
+  {
+    const { page, ctx, errs } = await open({ clock: '2026-09-17T14:00:00+08:00',
+      seed: `localStorage.setItem('my2026.gemini.key','good-key');localStorage.setItem('my2026.gemini.model','models/gemini-fake-pro')` });
+    await ctx.route('https://generativelanguage.googleapis.com/**', r => r.fulfill({ status: 503,
+      contentType: 'application/json', body: JSON.stringify({ error: { message: 'The model is overloaded.' } }) }));
+    await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('#prepDraftBtn').click());
+    await page.waitForTimeout(300);
+    await page.click('#dfRun'); await page.waitForTimeout(800);
+    const said = await page.evaluate(() => document.querySelector('#dfResult').textContent);
+    check('a failed call says why and points back at copy-and-paste',
+      said.includes('overloaded') && said.includes('複製 prompt'), said.slice(0, 80));
+    check('and the button is usable again', await page.evaluate(() => !document.querySelector('#dfRun').disabled));
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+}
+
 console.log('\n── the app carries no knowledge of one particular trip ──');
 {
   /* a different country, currency, party size, time zone and vocabulary,
