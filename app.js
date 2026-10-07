@@ -962,6 +962,71 @@ function parseDraft(text,keys){
   return {out,bad,unknown,weak};
 }
 
+/* ── provider：誰去跑這個 prompt ───────────────────────────
+   預設是「人」：app 產生 prompt，你貼給任何一個 AI，把 JSON 貼回來。那條路
+   沒有金鑰、沒有費用、不會壞，而且已經證明過品質夠用（D13）。
+
+   第二條是 Gemini，直接從瀏覽器打。**金鑰會存在這台裝置上，而且會從瀏覽器
+   送出去** —— 所以它是明確要自己開的選項，而不是預設。這個 repo 是公開的，
+   金鑰永遠不會進程式碼，也不會跟著部署走；它只在按下儲存的那支手機上。
+   發給同行的人的連結不會帶著你的金鑰，他們那邊就是沒有這個功能。
+
+   端點與欄位名取自 Gemini API 的 discovery document，不是記憶：
+   POST v1beta/{model}:generateContent?key=…
+   { contents:[{role,parts:[{text}]}], generationConfig:{responseMimeType} } */
+const geminiKeyStore=ns('gemini.key'), geminiModelStore=ns('gemini.model');
+const GEMINI='https://generativelanguage.googleapis.com/v1beta/';
+const readStore=k=>{ try{ return localStorage.getItem(k)||''; }catch{ return ''; } };
+const geminiKey=()=>readStore(geminiKeyStore);
+const geminiModel=()=>readStore(geminiModelStore);
+
+/* the key is passed in, never read from storage here: looking up models with
+   a key somebody just typed must not store it before it is known to work */
+async function geminiCall(path,init,key){
+  if(!key) throw new Error('還沒有設定金鑰');
+  const r=await fetch(`${GEMINI}${path}${path.includes('?')?'&':'?'}key=${encodeURIComponent(key)}`,init);
+  const body=await r.json().catch(()=>null);
+  if(!r.ok){
+    /* Google's error body is the useful part; a bare status tells nobody anything */
+    const msg=body&&body.error&&body.error.message?body.error.message:`HTTP ${r.status}`;
+    throw new Error(msg);
+  }
+  return body;
+}
+/* ask the key what it can actually run, rather than hardcoding a model name
+   that will be wrong by next year */
+async function geminiModels(key){
+  const out=[];
+  let token='';
+  do{
+    const page=await geminiCall(`models?pageSize=200${token?`&pageToken=${encodeURIComponent(token)}`:''}`,undefined,key);
+    for(const m of page.models||[])
+      if((m.supportedGenerationMethods||[]).includes('generateContent')) out.push(m.name);
+    token=page.nextPageToken||'';
+  }while(token&&out.length<400);
+  return out;
+}
+async function geminiRun(prompt){
+  const model=geminiModel();
+  if(!model) throw new Error('還沒有選模型');
+  const body=await geminiCall(`${model}:generateContent`,{
+    method:'POST', headers:{'content-type':'application/json'},
+    body:JSON.stringify({
+      contents:[{role:'user',parts:[{text:prompt}]}],
+      /* ask for JSON at the protocol level instead of hoping the prose rule
+         holds; the parser still unfences and validates whatever arrives */
+      generationConfig:{responseMimeType:'application/json'},
+    }),
+  },geminiKey());
+  const cand=(body.candidates||[])[0];
+  const text=((cand&&cand.content&&cand.content.parts)||[]).map(p=>p.text||'').join('').trim();
+  if(!text){
+    const why=cand&&cand.finishReason?`（${cand.finishReason}）`:'';
+    throw new Error(`沒有回傳內容${why}`);
+  }
+  return text;
+}
+
 /* ── 生成器：一種「要 AI 寫什麼」就是一個項目 ──────────────
    加一種新的生成內容，不應該要去動對話框、驗證流程或儲存邏輯。一個生成器
    只需要回答五件事：叫什麼、要為誰生成、prompt 長怎樣、回來的東西怎麼驗、
@@ -1119,6 +1184,7 @@ function openDraft(which,keys){
   $('#dfFor').textContent=g.describe(keys);
   $('#dfPaste').value=''; $('#dfResult').hidden=true; $('#dfResult').textContent='';
   $('#dfUndo').hidden=true;
+  $('#dfRun').hidden=!(geminiKey()&&geminiModel());
   refreshDraftButtons();
   $('#draftDialog').showModal();
 }
@@ -1127,6 +1193,53 @@ function openDraftAll(which){
   const todo=GENERATORS[which].targets();
   if(!todo.length){ toast(GENERATORS[which].none||'沒有要生成的項目'); return; }
   openDraft(which,todo);
+}
+function setupGemini(){
+  const dlg=$('#geminiDialog'), sel=$('#gmModel'), box=$('#gmResult');
+  const fill=list=>{
+    const current=geminiModel();
+    sel.innerHTML=list.map(n=>`<option value="${escapeHtml(n)}"${n===current?' selected':''}>${escapeHtml(n.replace(/^models\//,''))}</option>`).join('');
+  };
+  const open=()=>{
+    $('#gmKey').value=geminiKey();
+    const m=geminiModel();
+    fill(m?[m]:[]);
+    $('#gmForget').hidden=!geminiKey();
+    box.hidden=true; box.textContent='';
+    dlg.showModal();
+  };
+  $('#geminiBtn').onclick=open;
+  $('#closeGemini').onclick=$('#cancelGemini').onclick=()=>dlg.close();
+  $('#gmLoad').onclick=async()=>{
+    const btn=$('#gmLoad');
+    const typed=$('#gmKey').value.trim();
+    if(!typed){ $('#gmKey').focus(); toast('先貼上金鑰'); return; }
+    btn.disabled=true; btn.textContent='查詢中…';
+    box.hidden=false; box.textContent='正在用這把金鑰查可用的模型。';
+    try{
+      const list=await geminiModels(typed);
+      if(!list.length){ box.textContent='這把金鑰沒有任何可以產生內容的模型。'; return; }
+      fill(list);
+      box.textContent=`找到 ${list.length} 個可用模型，挑一個再按儲存。`;
+    }catch(err){
+      box.textContent='查不到：'+(err&&err.message||err);
+    }finally{ btn.disabled=false; btn.textContent='用這把金鑰查可用的模型'; }
+  };
+  $('#gmForget').onclick=()=>{
+    try{ localStorage.removeItem(geminiKeyStore); localStorage.removeItem(geminiModelStore); }catch{}
+    dlg.close(); toast('已移除金鑰');
+  };
+  $('#geminiForm').onsubmit=ev=>{
+    ev.preventDefault();
+    const key=$('#gmKey').value.trim();
+    if(!key){ $('#gmKey').focus(); toast('先貼上金鑰'); return; }
+    if(!sel.value){ toast('先查一次可用的模型再選一個'); return; }
+    try{
+      localStorage.setItem(geminiKeyStore,key);
+      localStorage.setItem(geminiModelStore,sel.value);
+    }catch{ toast('無法儲存，裝置儲存空間已滿'); return; }
+    dlg.close(); toast('已接上，起草時會多一顆「用 Gemini 產生」');
+  };
 }
 function setupDraft(){
   $('#closeDraft').onclick=()=>$('#draftDialog').close();
@@ -1152,6 +1265,18 @@ function setupDraft(){
       $('#dfPaste').value=text; $('#dfPaste').select();
       toast('無法自動複製，已放在下面的欄位，請手動複製');
     }
+  };
+  $('#dfRun').onclick=async()=>{
+    const btn=$('#dfRun'), box=$('#dfResult');
+    btn.disabled=true; btn.textContent='產生中…';
+    box.hidden=false; box.textContent='正在請 Gemini 產生，這通常要幾秒。';
+    try{
+      $('#dfPaste').value=await geminiRun(gen().prompt(draftKeys));
+      box.textContent='回來了。按「套用」之前可以先看一下下面的內容。';
+    }catch(err){
+      box.textContent='Gemini 沒有成功：'+(err&&err.message||err)
+        +'\n\n可以改用上面的「複製 prompt」，貼給任何一個 AI，再把 JSON 貼回來。';
+    }finally{ btn.disabled=false; btn.textContent='用 Gemini 產生'; }
   };
   $('#dfApply').onclick=()=>{
     const g=gen();
@@ -1249,6 +1374,7 @@ function setupFollow(){
   $('#flMore').onclick=()=>setFollowOpen($('#flDetail').hidden);
   setupBriefEditor();
   setupDraft();
+  setupGemini();
   $('#draftAllBtn').onclick=()=>openDraftAll('briefs');
   $('#prepDraftBtn').onclick=()=>openDraftAll('prep');
   $('#bfDraft').onclick=()=>{ $('#briefDialog').close(); openDraft('briefs',[editingKey]); };

@@ -101,6 +101,9 @@ localStorage     這台裝置的個人狀態。命名空間 = meta.id。
 | 能給別人用 | 勉強 | 不行 | 可以 |
 | 適合 | 今天就能做 | 只有自己用 | 真的要當產品 |
 
+**路 1 和路 2 都做了**（D13、D24）：複製貼上是預設，Gemini 是選用的第二條。
+金鑰只在那支裝置上，不進程式碼也不跟著部署（D25）。路 3 還沒有。
+
 關於路 2，官方文件寫得很直白（TypeScript SDK 的 `dangerouslyAllowBrowser`）：
 
 > Enabling the `dangerouslyAllowBrowser` option can be dangerous because it exposes your secret API credentials in the client-side code. […] **Internal tools:** If the application is used solely within a controlled internal environment where the users are trusted, the risk of credential exposure can be mitigated.

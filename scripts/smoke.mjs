@@ -1093,6 +1093,112 @@ for (const [label, value] of [
   await ctx.close();
 }
 
+console.log('\n── Gemini is an opt-in provider, and the key stays on the device ──');
+{
+  /* stand in for Google, with the shapes taken from its discovery document */
+  const google = (ctx, { key = 'good-key' } = {}) => ctx.route('https://generativelanguage.googleapis.com/**', route => {
+    /* `URL` is this file's base address, so parse the request the long way */
+    const href = route.request().url();
+    if (!href.includes(`key=${key}`))
+      return route.fulfill({ status: 400, contentType: 'application/json',
+        body: JSON.stringify({ error: { message: 'API key not valid. Please pass a valid API key.' } }) });
+    if (href.includes('/models?'))
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ models: [
+        { name: 'models/gemini-fake-pro', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/embed-only', supportedGenerationMethods: ['embedContent'] }] }) });
+    if (href.includes(':generateContent'))
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ candidates: [{ content: { parts: [
+        { text: JSON.stringify([{ due: '出發前7天', title: '確認護照效期', why: '效期不足會被拒載', priority: '高', note: '' }]) }] } }] }) });
+    return route.fulfill({ status: 404, body: '{}' });
+  });
+
+  {
+    const { page, ctx, errs } = await open({ clock: '2026-09-17T14:00:00+08:00' });
+    await google(ctx);
+    const val = fn => page.evaluate(fn);
+    await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('#prepDraftBtn').click());
+    await page.waitForTimeout(300);
+    check('with no key there is nothing to run, only the prompt to copy',
+      await val(() => document.querySelector('#dfRun').hidden));
+    await page.evaluate(() => document.querySelector('#closeDraft').click());
+    await page.waitForTimeout(200);
+
+    await page.evaluate(() => document.querySelector('#geminiBtn').click());
+    await page.waitForTimeout(300);
+    check('the dialog says where the key goes before anything is typed',
+      (await val(() => document.querySelector('.warn-note').textContent)).includes('這支手機'));
+    /* the key is not the only thing that leaves: so does the itinerary */
+    check('and that the trip itself is what gets sent',
+      (await val(() => [...document.querySelectorAll('.warn-note')].map(x => x.textContent).join(''))).includes('整份行程會一起送給 Google'));
+    await page.fill('#gmKey', 'bad-key');
+    await page.click('#gmLoad'); await page.waitForTimeout(600);
+    check('a key that does not work says what Google said',
+      (await val(() => document.querySelector('#gmResult').textContent)).includes('API key not valid'),
+      await val(() => document.querySelector('#gmResult').textContent));
+    /* a key that failed must not be left behind as if it had worked */
+    check('and a failed lookup stores nothing',
+      (await val(() => localStorage.getItem('my2026.gemini.key'))) === null);
+
+    await page.fill('#gmKey', 'good-key');
+    await page.click('#gmLoad'); await page.waitForTimeout(600);
+    check('a working key is asked what it can run, rather than a name being assumed',
+      (await val(() => [...document.querySelector('#gmModel').options].map(o => o.value))).join() === 'models/gemini-fake-pro',
+      (await val(() => [...document.querySelector('#gmModel').options].map(o => o.value))).join());
+    await page.evaluate(() => document.querySelector('#geminiForm button[value=default]').click());
+    await page.waitForTimeout(400);
+
+    await page.evaluate(() => document.querySelector('#prepDraftBtn').click());
+    await page.waitForTimeout(300);
+    check('now there is something to run', await val(() => !document.querySelector('#dfRun').hidden));
+    await page.click('#dfRun'); await page.waitForTimeout(800);
+    check('what comes back lands in the same box a paste would',
+      (await val(() => document.querySelector('#dfPaste').value)).includes('確認護照效期'));
+    await page.click('#dfApply'); await page.waitForTimeout(400);
+    /* the provider changes who runs the prompt, never what is allowed through */
+    check('and goes through the same gate, flagged the same way',
+      (await val(() => document.querySelector('#dfResult').textContent)).includes('已套用 1 個')
+      && (await val(() => JSON.parse(localStorage.getItem('my2026.prep.v1'))[0].by)) === 'ai');
+    await page.evaluate(() => document.querySelector('#closeDraft').click());
+    await page.waitForTimeout(200);
+
+    await page.evaluate(() => document.querySelector('#geminiBtn').click());
+    await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('#gmForget').click());
+    await page.waitForTimeout(400);
+    check('forgetting the key takes the model with it',
+      (await val(() => localStorage.getItem('my2026.gemini.key'))) === null
+      && (await val(() => localStorage.getItem('my2026.gemini.model'))) === null);
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+  /* the key is this device's; a follower opening the shared link has none */
+  {
+    const { page, ctx } = await open({ query: '?mode=follow', clock: '2026-09-17T14:00:00+08:00' });
+    check('the link handed to the group carries no key',
+      (await page.evaluate(() => localStorage.getItem('my2026.gemini.key'))) === null
+      && !(await page.evaluate(() => location.search)).includes('key'));
+    await ctx.close();
+  }
+  /* an outage is not a dead end: the copy-and-paste route is still there */
+  {
+    const { page, ctx, errs } = await open({ clock: '2026-09-17T14:00:00+08:00',
+      seed: `localStorage.setItem('my2026.gemini.key','good-key');localStorage.setItem('my2026.gemini.model','models/gemini-fake-pro')` });
+    await ctx.route('https://generativelanguage.googleapis.com/**', r => r.fulfill({ status: 503,
+      contentType: 'application/json', body: JSON.stringify({ error: { message: 'The model is overloaded.' } }) }));
+    await page.click('.tab[data-view="todos"]'); await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('#prepDraftBtn').click());
+    await page.waitForTimeout(300);
+    await page.click('#dfRun'); await page.waitForTimeout(800);
+    const said = await page.evaluate(() => document.querySelector('#dfResult').textContent);
+    check('a failed call says why and points back at copy-and-paste',
+      said.includes('overloaded') && said.includes('複製 prompt'), said.slice(0, 80));
+    check('and the button is usable again', await page.evaluate(() => !document.querySelector('#dfRun').disabled));
+    check('no errors', !errs.length, errs[0] || '');
+    await ctx.close();
+  }
+}
+
 console.log('\n── the app carries no knowledge of one particular trip ──');
 {
   /* a different country, currency, party size, time zone and vocabulary,

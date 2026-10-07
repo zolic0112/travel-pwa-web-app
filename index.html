@@ -144,6 +144,7 @@
         </div>
         <div id="todoList" class="stack grouped"></div>
         <button id="prepDraftBtn" class="btn quiet prep-gen" type="button">用 AI 生成行前準備清單</button>
+        <button id="geminiBtn" class="btn quiet prep-gen" type="button">接上 Gemini（選用）</button>
       </div>
 
       <div class="pane" id="paneMine" role="tabpanel" aria-labelledby="segMine" hidden>
@@ -308,8 +309,37 @@
     <div class="dialog-actions">
       <button type="button" class="btn quiet danger" id="dfClearAi" hidden></button>
       <button type="button" class="btn quiet danger" id="dfUndo" hidden>復原這次套用</button>
+      <button type="button" class="btn quiet" id="dfRun" hidden>用 Gemini 產生</button>
       <button type="button" class="btn primary" id="dfApply">套用</button>
     </div>
+  </dialog>
+
+  <!-- The key lives on this device only. It never enters the repo, never
+       ships with the deploy, and the link handed to the group does not carry
+       it — so this is opt-in, per phone, and says so before anything is typed. -->
+  <dialog id="geminiDialog">
+    <form id="geminiForm" method="dialog">
+      <div class="dialog-head"><h2>接上 Gemini</h2><button type="button" id="closeGemini" aria-label="關閉">×</button></div>
+      <p class="dialog-hint">接上之後，起草可以直接產生，不用複製貼上。<b>不接也完全可以用</b> —— 複製 prompt 貼給任何一個 AI 的那條路不會消失。</p>
+      <div class="form-grid">
+        <p class="warn-note full">金鑰會存在<b>這支手機</b>裡，而且會從瀏覽器直接送到 Google。
+          它不會進到程式碼、不會跟著網站部署，發給同行的人的連結也不會帶著它。
+          <b>只在自己的裝置上接，不要用公司或共用的金鑰。</b></p>
+        <p class="warn-note full">按下「用 Gemini 產生」時，<b>整份行程會一起送給 Google</b> ——
+          日期、航班、住宿、備註都在裡面。不想送的話就用複製 prompt 那條路，自己決定貼什麼。</p>
+        <label class="full">API 金鑰<input id="gmKey" type="password" autocomplete="off" autocorrect="off"
+          autocapitalize="off" spellcheck="false" placeholder="貼上你自己的 Gemini API 金鑰" /></label>
+        <div class="full"><button type="button" class="btn quiet" id="gmLoad">用這把金鑰查可用的模型</button></div>
+        <label class="full">模型<select id="gmModel"></select>
+          <span class="field-note">清單是用你的金鑰問出來的，不是寫死的</span></label>
+        <pre class="draft-result full" id="gmResult" hidden></pre>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn quiet danger" id="gmForget" hidden>移除金鑰</button>
+        <button type="button" class="btn quiet" id="cancelGemini">取消</button>
+        <button class="btn primary" value="default">儲存</button>
+      </div>
+    </form>
   </dialog>
 
   <dialog id="sourceDialog">
