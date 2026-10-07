@@ -492,7 +492,7 @@ main{width:100%;max-width:1000px;margin:0 auto;padding:18px 20px 120px;flex:1;to
 .todo.done .check:after{opacity:1;transform:rotate(-45deg) scale(1)}
 .todo.done{opacity:.55}
 .todo.done h3{text-decoration:line-through}
-.todo-top{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.todo-top{display:flex;align-items:center;gap:8px}
 .due{font-family:var(--mono);font-size:10.5px;color:var(--brand);font-weight:600}
 .pri-chip{font-size:10px;font-weight:800;border-radius:var(--r-pill);padding:2px 7px;background:var(--sunken);color:var(--muted)}
 .pri-chip.high{background:var(--danger-soft);color:var(--danger)}
@@ -661,6 +661,12 @@ td:nth-child(3),td:nth-child(4){font-family:var(--mono);font-variant-numeric:tab
 .row-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
 /* a generated to-do sits in the shared list with a way to drop it, the same
    shape 我的待辦 already uses */
+.todo-when{
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  margin:18px 2px 2px;font-size:12.5px;font-weight:900;color:var(--text);
+}
+.todo-when:first-child{margin-top:2px}
+.todo-when span{font-size:11px;font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}
 .todo-wrap{display:flex;align-items:flex-start;gap:4px}
 .prep-gen{width:100%;margin-top:12px;border-style:dashed}
 .warn-note{
