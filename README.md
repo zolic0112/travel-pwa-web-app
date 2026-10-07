@@ -50,6 +50,29 @@ node scripts/smoke.mjs
 純靜態，可直接放 GitHub Pages / Cloudflare Pages / Netlify / Vercel。
 不要只雙擊 `index.html` 測 PWA；Service Worker 需要 HTTPS 或 localhost。
 
+推上 `main` 就會自動部署。**部署是這個專案唯一的「同步」機制** —— `trip.js`
+跟著網站走，所有人打開看到的都一樣。
+
+### 旅途中出事怎麼退回舊版
+
+`backup/*` 分支指著已知可用的版本。退回去是把 `main` 倒回那個點再推一次：
+
+```bash
+git fetch origin
+git checkout main
+git reset --hard origin/backup/v17-before-prep-list   # 換成要回到的那個分支
+git push --force-with-lease origin main
+```
+
+推完等大約一分鐘，手機上重新開一次就會拿到舊版（shell 走 network-first，
+不需要清快取）。**人在旅途中的時候，這比現場除錯快得多。**
+
+出發前要留一個備份：
+
+```bash
+git branch backup/<說明> origin/main && git push -u origin backup/<說明>
+```
+
 ## 本機
 
 ```bash
